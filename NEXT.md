@@ -13,7 +13,6 @@
   collector number, so matching is by set + name and is ambiguous for alt arts. Plan: match only
   unambiguous products, list the rest for manual linking.
 - **CSV / paste-a-list bulk import** and a downloadable template (spec §4.3).
-- **"Cards vs sealed" breakdown** — needs sealed products (Phase 5).
 - Historical FX: values convert at the latest rate. A purchase's THB cost at the time it was paid
   could be stored per order if wanted.
 - Today's change and movers use near-mint prices (condition multipliers apply to totals, not to deltas).
@@ -33,6 +32,16 @@
 - Price impact needs 30 days of daily prices either side of a ruling, so it fills in over time.
 - Prisma `migrate dev` stops on warnings in a non-interactive shell; schema changes with warnings are
   generated with `prisma migrate diff` and applied with `migrate deploy` (see CHANGELOG, Phase 4).
+
+## Deferred from Phase 5
+- Sealed prices come from TCGplayer only (or your manual price); no local or Cardmarket sealed prices.
+- A pack opening is priced at the moment you save it; later price moves change the pulls' value, not
+  their cost basis (by design).
+- Import requires an empty collection; there's no merge. Alerts aren't exported.
+- Value-report card images are fetched when the PDF is made; if the image host is unreachable the
+  report renders without them.
+- PWA has no offline data; it shows an offline page. Push notifications for alerts are not built.
+- Trade lists are one per user; shared links show market prices, never your costs or holdings.
 
 ## Verify before relying on them (`TODO verify`)
 - `src/config/gameRules.ts` — sourced from Core Rules §103 on 2026-10-26; only the sideboard size (0 or 8) is still `TODO verify`.

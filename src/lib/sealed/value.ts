@@ -27,6 +27,7 @@ export interface SealedRow {
   openedDays: string[]; // one entry per unit opened
   manualPrice: number | null;
   manualCurrency: string | null;
+  manualPriceAt: Date | null;
   imageUrl: string | null;
 }
 
@@ -58,6 +59,7 @@ export async function loadSealed(db: PrismaClient, userId: string): Promise<Seal
     openedDays: s.openings.map((o) => dayKey(o.openedOn)),
     manualPrice: s.manualPrice,
     manualCurrency: s.manualCurrency,
+    manualPriceAt: s.manualPriceAt,
     imageUrl: s.imageUrl,
   }));
 }
@@ -75,7 +77,7 @@ export async function loadSealedPrices(db: PrismaClient, rows: SealedRow[]) {
 }
 
 export function sealedQuote(r: SealedRow, series: Map<string, { day: string; amount: number; currency: string; asOf: Date }[]>): SealedQuote | null {
-  if (r.manualPrice != null) return { amount: r.manualPrice, currency: r.manualCurrency ?? r.currency, source: "MANUAL", asOf: new Date(), day: dayKey() };
+  if (r.manualPrice != null) return { amount: r.manualPrice, currency: r.manualCurrency ?? r.currency, source: "MANUAL", asOf: r.manualPriceAt ?? new Date(0), day: r.manualPriceAt ? dayKey(r.manualPriceAt) : "1970-01-01" };
   const last = r.tcgplayerId ? series.get(r.tcgplayerId)?.at(-1) : undefined;
   return last ? { amount: last.amount, currency: last.currency, source: "TCGPLAYER", asOf: last.asOf, day: last.day } : null;
 }

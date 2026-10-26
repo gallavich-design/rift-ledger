@@ -1,4 +1,4 @@
-// Renders the value report as a PDF with pdfkit. Fonts: IBM Plex Sans / Mono (OFL, via @fontsource),
+// Renders the value report as a PDF with pdfkit. Fonts: IBM Plex Sans / Mono (OFL, via @ibm/plex-*),
 // matching the app. Card thumbnails are fetched and downscaled best-effort; a missing image never
 // blocks the report.
 
@@ -8,11 +8,11 @@ import { SOURCE_LABEL } from "@/lib/domain/enums";
 import type { ReportData } from "./valueReport";
 import { formatStampPlain, money, pct } from "./format";
 
-const FONT_DIR = path.join(process.cwd(), "node_modules/@fontsource");
+const FONT_DIR = path.join(process.cwd(), "node_modules/@ibm");
 const FONTS = {
-  sans: path.join(FONT_DIR, "ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff"),
-  sansMed: path.join(FONT_DIR, "ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff"),
-  mono: path.join(FONT_DIR, "ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff"),
+  sans: path.join(FONT_DIR, "plex-sans/fonts/complete/woff/IBMPlexSans-Regular.woff"),
+  sansMed: path.join(FONT_DIR, "plex-sans/fonts/complete/woff/IBMPlexSans-SemiBold.woff"),
+  mono: path.join(FONT_DIR, "plex-mono/fonts/complete/woff/IBMPlexMono-Regular.woff"),
 };
 const INK = "#16181d";
 const INK3 = "#626873";

@@ -98,7 +98,7 @@ export function TradeCalculator({
             const q = quotes[l.variant.id];
             const v = lineValue(toTrade(l));
             return (
-              <li key={l.key} className="grid grid-cols-[minmax(0,1fr)_56px_76px_auto] items-center gap-2 py-2.5" data-testid="trade-line">
+              <li key={l.key} className="grid grid-cols-[minmax(0,1fr)_56px_104px_auto] items-center gap-2 py-2.5" data-testid="trade-line">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{l.variant.name}</p>
                   <p className="num truncate text-xs text-ink-3">{variantLabel(l.variant)}</p>

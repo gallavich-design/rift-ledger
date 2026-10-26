@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { loadTradeLists, type TradeRow } from "@/lib/trade/lists";
-import { variantLabel } from "@/components/cards/VariantPicker";
+import { variantLabel } from "@/lib/catalog/variantLabel";
 import { SourceStamp } from "@/components/money/Money";
 import { formatMoney } from "@/lib/money/money";
 

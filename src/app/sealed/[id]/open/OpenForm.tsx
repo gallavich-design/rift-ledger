@@ -123,7 +123,7 @@ export function OpenForm({
               const a = alloc.find((x) => x.key === l.key);
               const q = quotes[l.variant.id];
               return (
-                <li key={l.key} className="grid grid-cols-[minmax(0,1fr)_64px_84px_auto] items-end gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_64px_84px_140px_auto]">
+                <li key={l.key} className="grid grid-cols-[minmax(0,1fr)_64px_96px_auto] items-end gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_64px_96px_140px_auto]">
                   <div className="min-w-0 self-center">
                     <p className="truncate text-sm font-medium">{l.variant.name}</p>
                     <p className="num truncate text-xs text-ink-3">{variantLabel(l.variant)}</p>

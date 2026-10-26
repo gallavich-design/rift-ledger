@@ -10,7 +10,7 @@ export default defineConfig({
   timeout: 90_000,
   workers: 1, // tests share one database
   fullyParallel: false,
-  use: { baseURL: `http://localhost:${PORT}`, colorScheme: "light" },
+  use: { baseURL: `http://localhost:${PORT}`, colorScheme: "light", screenshot: "only-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: `npx next start -p ${PORT}`,

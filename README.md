@@ -30,6 +30,8 @@ overrides are entered by you. Settings → **Load demo data** builds a separate 
 | `npm test` | Vitest unit tests (includes every worked example from the spec) |
 | `npm run e2e` | Playwright tests. Needs `npm run build`, synced cards and prices. Runs on a copy (`prisma/e2e.db`), never your data. |
 | `npm run typecheck` / `lint` | TypeScript / ESLint |
+| `npx tsx scripts/make-icons.ts` | Re-render the PWA PNG icons from `public/icon.svg` |
+| `npx tsx scripts/verify-roundtrip.ts <export.json> <new.db>` | Import an export into a brand-new database and print its dashboard totals |
 
 ## Keeping card data fresh
 
@@ -53,8 +55,11 @@ The catalogue is stored locally and never fetched per page view. Refresh it once
 4. **Snapshots** — upserted on (printing, source, day), so re-running a day overwrites, never duplicates.
    "Day" is the calendar day in Asia/Bangkok (`src/config/app.ts`).
 
-Prices TCGplayer lists that don't match a Riftcodex printing (sealed product, and sets Riftcodex
-hasn't added yet) are counted as "unmatched" and skipped.
+5. **Sealed** — TCGplayer products with no collector number or rarity (booster packs, displays, cases,
+   bundles) get a daily `SealedPriceSnapshot`, keyed (product, source, day) like card prices.
+
+Prices that match neither a Riftcodex printing nor a sealed product (sets Riftcodex hasn't added yet)
+are counted as "unmatched" and skipped.
 
 ## Money rules
 
@@ -113,6 +118,35 @@ document them in `.env.example`.
   ±% move alerts at most once a week. Watches are checked by the daily price job and right after you
   enter a manual or local price.
 - **Meta**: paste tournament lists to see % owned and cost to complete against your collection.
+
+## Sealed product, pack opening and the binder
+
+- **Sealed** (`/sealed`): link a box or pack to its TCGplayer product for daily prices, or set a manual
+  price (it shows when you set it). Landed cost each = (price × qty + shipping/forwarding/tax) ÷ qty.
+- **Opening** one unit splits its landed cost across the pulls by market value at that moment
+  (`allocatePackCost`, spec Example C): cost basis = value × box cost ÷ pulls value, whole cents with
+  the leftover cents on the most valuable pull, so the lots add up to exactly what the box cost. If
+  nothing is priced yet, the split is by card count. Every pull becomes a lot linked to the opening;
+  "Undo this opening" removes them and puts the box back (only if none of them has been sold).
+- **Set binder** (`/collection/binder`): one slot per printing (normal and foil fill the same slot);
+  "Base set" = standard and promo art, "Every printing" adds alternate, overnumbered and signature.
+  Cost to complete = the cheapest priced printing of each missing slot.
+
+## Trade, reports and your data
+
+- **Trade calculator** (`/trade`) prices both sides with the same price book as card pages and the
+  dashboard (default valuation source, manual override wins), in your display currency, with your
+  condition multipliers. **Haves & wants** can be shared as a read-only link (`/share/trade/<token>`).
+- **Value report** (`/reports`, `GET /api/reports/value?format=pdf|csv&source=…`) is built by
+  `buildPortfolio()` — the same function the dashboard uses — so its total always equals the dashboard
+  for the same source. The PDF uses IBM Plex (OFL, `@ibm/plex-*`) and shows amounts as `THB 1,234.00`.
+- **Export / import** (Settings → Your data): one JSON file with everything you entered plus the
+  cards, price history and FX rates it depends on. References travel by stable keys (`variantKey`,
+  `Card.key`, `Set.code`), so an export imports into a fresh database — even one that hasn't synced
+  cards — and reproduces the same dashboard totals. Import only goes into an empty collection.
+  Alerts aren't exported (they're regenerated). Lots and sales are also available as CSV.
+- **PWA**: manifest + PNG/maskable icons + a service worker that caches only the static shell and shows
+  an offline page; prices are never served from cache. Install from the browser menu on a phone.
 
 ## Where things live
 

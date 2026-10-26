@@ -326,6 +326,7 @@ model SealedProduct {
   notes       String?
   manualPrice    Int? // override when TCGplayer has no price for this product
   manualCurrency String?
+  manualPriceAt  DateTime? // when the manual price was last set (shown next to it)
   imageUrl       String?
   storageLocationId String?
   storageLocation   StorageLocation? @relation(fields: [storageLocationId], references: [id], onDelete: SetNull)

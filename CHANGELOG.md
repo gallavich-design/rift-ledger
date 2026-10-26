@@ -1,5 +1,37 @@
 # Changelog
 
+## Phase 5 — Extras (2026-10-26)
+
+### Schema migrations
+- `phase5_sealed_prices_trade_lists`: new `SealedPriceSnapshot` (daily sealed prices, unique on
+  product + source + day) and `TradeListItem` (haves/wants); `SealedProduct` gains `manualPrice`,
+  `manualCurrency`, `imageUrl`, `storageLocationId`; `Settings.tradeShareToken`. All additive; existing
+  sealed rows copied unchanged.
+- `phase5_sealed_manual_price_at`: `SealedProduct.manualPriceAt`, so a manual sealed price shows when
+  it was set. Rows that already had a manual price get the migration time.
+
+### Added
+- Price job stores sealed product prices (packs, displays, cases, bundles) from TCGplayer.
+- Sealed: add products (TCGplayer-linked or by name), positions with value, source and time, price
+  history, manual price, delete.
+- Pack/box opening: search-as-you-type pulls, live pulls-vs-paid result, then one lot per pull with its
+  value-weighted share of the box cost (Example C). Opening page with cost ratio, pull stats by rarity
+  and special printings, and undo.
+- Dashboard: sealed value and cost are in the totals and the value chart; new "Cards vs sealed" breakdown.
+- Set completion binder: grid per set, owned vs missing, % complete, cost to complete, base set or
+  every printing.
+- Trade: two-sided calculator (condition-adjusted, prices match card pages), haves & wants lists with a
+  read-only share link.
+- Reports: collection value report as PDF (totals by set, top 50 cards with images, graded, sealed,
+  valuation source and dates) and CSV; total equals the dashboard.
+- Settings → Your data: full JSON export (importable into a fresh database), lots CSV, sales CSV, import.
+- PWA: PNG + maskable icons, Apple touch icon, shortcuts, service worker with an offline page.
+- Sealed, Trade and Reports appear in the navigation.
+
+### Fixed
+- The card picker no longer pulls focus back after a pick if you've already moved to another field.
+
+
 ## Phase 4 — Rulings, alerts & meta (2026-10-26)
 
 ### Schema migration `phase4_rulings_watch_alerts_meta`

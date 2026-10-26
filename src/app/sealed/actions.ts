@@ -98,7 +98,7 @@ export async function setSealedPrice(payload: z.input<typeof ManualInput>): Prom
   const userId = await getCurrentUserId();
   const n = await db.sealedProduct.updateMany({
     where: { id: parsed.data.id, userId },
-    data: { manualPrice: parsed.data.price, manualCurrency: parsed.data.price == null ? null : parsed.data.currency },
+    data: { manualPrice: parsed.data.price, manualCurrency: parsed.data.price == null ? null : parsed.data.currency, manualPriceAt: parsed.data.price == null ? null : new Date() },
   });
   if (!n.count) return { ok: false, message: "That product no longer exists." };
   refresh();

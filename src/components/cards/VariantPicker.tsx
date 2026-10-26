@@ -33,17 +33,8 @@ interface CardHit {
   domains: string;
 }
 
-export function variantLabel(v: Pick<PickedVariant, "art" | "finish" | "setCode" | "collectorNumber" | "graded" | "language">) {
-  return [
-    `${v.setCode}·${String(v.collectorNumber ?? "").padStart(3, "0")}`,
-    v.art,
-    v.finish === "FOIL" ? "Foil" : "Normal",
-    v.language !== "EN" ? v.language : null,
-    v.graded,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
+import { variantLabel } from "@/lib/catalog/variantLabel";
+export { variantLabel };
 
 /**
  * Two-step, keyboard-friendly picker: type a card name (typos fine) → Enter picks the top card →
@@ -102,7 +93,11 @@ export function VariantPicker({
     if (resetOnPick) {
       setQ("");
       setVariants([]);
-      requestAnimationFrame(() => inputRef.current?.focus());
+      // Keep typing flow — but never pull focus back if the user has already moved to another field.
+      requestAnimationFrame(() => {
+        const a = document.activeElement;
+        if (!a || a === document.body || a.closest(`[data-picker="${CSS.escape(uid)}"]`)) inputRef.current?.focus();
+      });
     }
   }
 
@@ -127,7 +122,7 @@ export function VariantPicker({
 
   if (value) {
     return (
-      <div>
+      <div data-picker={uid}>
         <span className="mb-1.5 block text-sm font-medium">{label}</span>
         <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-rule bg-sheet px-2 py-1.5">
           <Thumb url={value.imageUrl} domains={value.domains} />
@@ -145,7 +140,7 @@ export function VariantPicker({
 
   if (card) {
     return (
-      <div>
+      <div data-picker={uid}>
         <span className="mb-1.5 block text-sm font-medium" id={`${uid}-print`}>
           Which printing of {card.name}?
         </span>
@@ -194,7 +189,7 @@ export function VariantPicker({
   }
 
   return (
-    <div className="relative">
+    <div data-picker={uid} className="relative">
       <label htmlFor={`${uid}-q`} className="mb-1.5 block text-sm font-medium">
         {label}
       </label>

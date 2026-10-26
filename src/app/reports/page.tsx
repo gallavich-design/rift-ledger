@@ -67,7 +67,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 ["Cards", <MoneyText key="c" amount={r.totals.cardsValue} currency={r.display} />],
                 ["Sealed", <MoneyText key="s" amount={r.totals.sealedValue} currency={r.display} />],
                 ["Cost basis", <MoneyText key="b" amount={r.totals.cost} currency={r.display} />],
-                ["Unrealized", <Delta key="u" amount={r.totals.unrealized} currency={r.display} pct={r.totals.unrealizedPct} />],
+                [
+                  "Unrealized",
+                  <span key="u">
+                    <Delta amount={r.totals.unrealized} currency={r.display} />
+                    <Delta amount={null} pct={r.totals.unrealizedPct} className="block text-xs font-normal" />
+                  </span>,
+                ],
               ].map(([k, v]) => (
                 <div key={k as string} className="bg-sheet px-3 py-2.5">
                   <dt className="eyebrow">{k}</dt>

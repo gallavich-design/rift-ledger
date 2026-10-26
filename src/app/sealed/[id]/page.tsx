@@ -88,7 +88,7 @@ export default async function SealedDetail({ params, searchParams }: { params: P
                   <MoneyText amount={product.landedUnitCost} currency={product.currency} />
                 </dd>
               </div>
-              <div className="bg-sheet px-4 py-3">
+              <div className="col-span-2 bg-sheet px-4 py-3 sm:col-span-1">
                 <dt className="eyebrow">Unrealized</dt>
                 <dd className="mt-1.5 text-[17px] font-medium">{pos ? <Delta amount={pos.pl} currency={display} pct={pos.plPct} /> : <span className="num text-ink-3">—</span>}</dd>
               </div>
