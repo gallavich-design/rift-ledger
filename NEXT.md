@@ -19,8 +19,16 @@
 - Today's change and movers use near-mint prices (condition multipliers apply to totals, not to deltas).
 - Three TCGplayer groups (Legacy, Radiance, Secret Garden) aren't in Riftcodex yet, so they can't be priced.
 
+## Deferred from Phase 3
+- **Piltover Archive import** — `piltoverarchive.com/api/external/v1/decks` answers, but the site's
+  robots.txt disallows `/api/`, so it isn't used (spec: don't scrape sites that forbid it). Ask the
+  site owners for permission or a key; until then, paste the list.
+- Tokens (e.g. "Gold // Buff") can be added to a deck; the Core Rules text read for §103 doesn't
+  state they're excluded, so the validator doesn't invent a rule. Revisit with the full rules.
+- One physical copy used in two decks counts as owned in both.
+
 ## Verify before relying on them (`TODO verify`)
-- `src/config/gameRules.ts` — deck size, copy limit, rune deck, battlefields, sideboard, signature rules.
+- `src/config/gameRules.ts` — sourced from Core Rules §103 on 2026-10-26; only the sideboard size (0 or 8) is still `TODO verify`.
 - `src/config/rotation.ts` — rotation dates and which set codes count as Sets 1–5.
 - `src/config/domains.ts` — domain hues vs official iconography.
 

@@ -1,5 +1,46 @@
 # Changelog
 
+## Phase 3 — Decks (2026-10-26)
+
+### Schema migration `phase3_deck_pending_import_lines`
+- New `Deck.pendingImportLines` (JSON, default `[]`): decklist lines an import couldn't match, kept
+  so they can be fixed later. Existing decks get an empty list.
+
+### Game rules
+- `src/config/gameRules.ts` now cites Riftbound Core Rules §103 (via RiftJudge) for every value:
+  1 Legend, 1 Chosen Champion matching the Legend's tag, main deck ≥ 40 incl. champion, 3 copies per
+  name (champion and sideboard included), ≤ 3 Signature cards sharing the Legend's tag, 12 runes,
+  3 unique battlefields, domain identity from the Legend. Sideboard 0 or 8 comes from riftbound.gg's
+  official deckbuilding guide (still `TODO verify` against the tournament rules).
+
+### Added
+- Deck builder: sections for Legend, Chosen Champion, main deck, runes, battlefields, sideboard;
+  add cards by typing (Enter adds one); steppers; move a copy to/from sideboard; make Chosen Champion.
+- Live legality checker: one specific, actionable message per broken rule, with the offending
+  cards marked in the list.
+- Cost panel: deck value, owned vs missing, cost to complete (Example D), budget build at the
+  cheapest printing of each card with every swap and its saving, still-to-buy list.
+- Proxies / borrowed copies: count for legality, never as owned.
+- Per-card "printing to price" choice.
+- Stats: energy curve, type and domain split, average energy.
+- Versions: every save records a snapshot and a "−2 X, +2 Y" diff; restore any version.
+- Paste-a-decklist import: tolerant of common formats and typos; unmatched lines are kept and listed
+  with suggestions to fix or dismiss.
+- Export: text (round-trips through the importer), CSV with printings and prices, PNG image of the list.
+- Read-only share link (no prices, collection or owner shown).
+- Match log with win rate overall and by opponent Legend.
+- Deck value over time.
+- Card page: "Add to deck" and "In your decks".
+
+### Fixed
+- Search index kept multi-word champion tags ("Master Yi") intact.
+- Match form: a fast second entry could be lost while the previous one saved.
+
+### Tests
+- 102 unit tests incl. Example D, a break-and-fix test for every rule, budget ≤ normal, import, diff, win rates.
+- 26 browser checks across Phases 1–3 (7 new for decks).
+
+
 ## Phase 2 — Portfolio (2026-10-26)
 
 ### Schema migration `phase2_variant_key_tcg_products_lot_total`

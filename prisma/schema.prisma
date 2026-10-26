@@ -350,6 +350,7 @@ model Deck {
   format     String   @default("STANDARD")
   notes      String?
   shareToken String?  @unique
+  pendingImportLines String @default("[]") // JSON: decklist lines from an import that matched no card
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

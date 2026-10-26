@@ -155,7 +155,7 @@ export function LineChart({
         <div ref={box} className="absolute inset-0" role="img" aria-label={ariaLabel} />
         {pointCount === 0 && <p className="absolute inset-0 grid place-items-center px-6 text-center text-sm text-ink-3">{emptyText}</p>}
         {pointCount === 1 && (
-          <p className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-xs text-ink-3">One day of history so far — the line appears from the second day.</p>
+          <p className="pointer-events-none absolute inset-x-0 top-1 text-center text-xs text-ink-3">One day of history so far — the line appears from the second day.</p>
         )}
         {hover && hover.values.length > 0 && (
           <div

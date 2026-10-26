@@ -93,7 +93,8 @@ function scoreDoc(tokens: string[], d: IndexedDoc, q: string): number {
 
 const MIN_SCORE = 0.58;
 
-export function rankSearch(idx: SearchIndex, query: string, limit = 20): SearchDoc[] {
+/** Ranked matches with a 0–1 confidence (10 = exact name). */
+export function rankSearchScored(idx: SearchIndex, query: string, limit = 20): { doc: SearchDoc; score: number }[] {
   const q = normalizeForSearch(query);
   if (!q) return [];
   const tokens = q.split(" ");
@@ -102,10 +103,14 @@ export function rankSearch(idx: SearchIndex, query: string, limit = 20): SearchD
     .filter((x) => x.s >= MIN_SCORE)
     .sort((a, b) => b.s - a.s || a.d.doc.name.length - b.d.doc.name.length || a.d.doc.name.localeCompare(b.d.doc.name))
     .slice(0, limit)
-    .map((x) => x.d.doc);
+    .map((x) => ({ doc: x.d.doc, score: x.s }));
 }
 
-async function getIndex(db: PrismaClient) {
+export function rankSearch(idx: SearchIndex, query: string, limit = 20): SearchDoc[] {
+  return rankSearchScored(idx, query, limit).map((x) => x.doc);
+}
+
+export async function getSearchIndex(db: PrismaClient) {
   if (index) return index;
   const cards = await db.card.findMany({
     select: {
@@ -120,10 +125,10 @@ async function getIndex(db: PrismaClient) {
       set: { select: { code: true } },
     },
   });
-  index = buildIndex(cards.map(({ set, tags, ...c }) => ({ ...c, tags: tags.replaceAll("|", " ").trim(), setCode: set.code })));
+  index = buildIndex(cards.map(({ set, ...c }) => ({ ...c, setCode: set.code }))); // tags stay pipe-delimited ("|Master Yi|")
   return index;
 }
 
 export async function searchCards(db: PrismaClient, query: string, limit = 20) {
-  return rankSearch(await getIndex(db), query, limit);
+  return rankSearch(await getSearchIndex(db), query, limit);
 }

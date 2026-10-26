@@ -20,6 +20,8 @@ import { Delta, SourceStamp } from "@/components/money/Money";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/ui";
 import { Disclosure, LocalPriceForm, ManualPriceForm, MoveLotSelect } from "./PriceForms";
+import { AddToDeck } from "./AddToDeck";
+import { SECTION_LABEL, type Section } from "@/lib/decks/types";
 
 export const dynamic = "force-dynamic";
 
@@ -54,13 +56,15 @@ export default async function CardPage({ params, searchParams }: { params: Promi
   );
   const variantIds = variants.map((x) => x.id);
 
-  const [snaps, localReports, manual, lots, locations, importLines] = await Promise.all([
+  const [snaps, localReports, manual, lots, locations, importLines, myDecks, usedIn] = await Promise.all([
     db.priceSnapshot.findMany({ where: { variantId: { in: variantIds } }, orderBy: { day: "asc" } }),
     db.localPriceReport.findMany({ where: { userId, variantId: { in: variantIds } }, orderBy: [{ seenOn: "asc" }, { createdAt: "asc" }] }),
     db.manualPrice.findMany({ where: { userId, variantId: { in: variantIds } } }),
     db.lot.findMany({ where: { userId, variantId: { in: variantIds }, remainingQuantity: { gt: 0 } }, include: { storageLocation: true, order: { select: { id: true, seller: true } } }, orderBy: { acquiredOn: "asc" } }),
     db.storageLocation.findMany({ where: { userId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.lot.findMany({ where: { userId, order: { currency: "USD" } }, select: { quantity: true, unitPrice: true, landedTotal: true } }),
+    db.deck.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, select: { id: true, name: true } }),
+    db.deckCard.findMany({ where: { cardId: card.id, deck: { userId } }, include: { deck: { select: { id: true, name: true } } } }),
   ]);
 
   const heldByVariant = new Map<string, number>();
@@ -177,7 +181,24 @@ export default async function CardPage({ params, searchParams }: { params: Promi
                 <Link href={`/collection/sell?variant=${selected.id}`}>Record sale</Link>
               </Button>
             )}
+            <AddToDeck cardId={card.id} decks={myDecks} />
           </div>
+          {usedIn.length > 0 && (
+            <p className="mt-3 text-sm text-ink-2" data-testid="used-in-decks">
+              In your decks:{" "}
+              {usedIn.map((u, i) => (
+                <span key={u.id}>
+                  {i > 0 && ", "}
+                  <Link href={`/decks/${u.deck.id}`} className="text-quill hover:underline">
+                    {u.deck.name}
+                  </Link>{" "}
+                  <span className="num text-ink-3">
+                    ({u.quantity}× {SECTION_LABEL[u.section as Section].toLowerCase()})
+                  </span>
+                </span>
+              ))}
+            </p>
+          )}
 
           {domains.length > 0 && (
             <div className="mt-5 flex flex-wrap gap-1.5">

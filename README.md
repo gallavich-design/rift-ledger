@@ -93,6 +93,17 @@ with a clear message when the shape changes), use `fetchJson` from `http.ts` for
 backoff on 429/5xx, and export an object implementing the interface. Keep keys in `.env` and
 document them in `.env.example`.
 
+## Decks
+
+- Paste a list on **Decks → New deck**. Accepted: section headers (`Legend:`, `Champion:`, `Main Deck:`,
+  `Runes:`, `Battlefields:`, `Sideboard:`) and lines like `3 Name`, `3x Name`, `Name x3`, `Name (3)`.
+  Legends, runes and battlefields are sorted by card type even without headers; if no Chosen Champion
+  is given, one copy of the first champion matching the Legend is promoted. Unmatched lines are kept
+  on the deck to fix.
+- Legality comes only from `src/config/gameRules.ts` (sources cited there). Banned cards: add names to
+  `bannedCardNames`, or enter a ban in News & Alerts (Phase 4).
+- Proxies count toward legality but never as owned, so they appear in cost to complete.
+
 ## Where things live
 
 - `src/config/gameRules.ts` — every deck-construction rule (values marked `TODO verify`)
