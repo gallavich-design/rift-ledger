@@ -1,0 +1,467 @@
+// Rift Ledger — domain schema.
+// Conventions:
+//  * Money = integer minor units (cents / satang) + ISO currency code. Never floats.
+//  * Enum-like fields are Strings (SQLite has no enums); allowed values live in src/lib/domain/enums.ts.
+//  * Catalog tables (Set, Card, CardVariant, PriceSnapshot, RulingEvent) are global/shared.
+//    Everything a person owns or enters carries a userId.
+//  * Schema must stay portable to Postgres: no SQLite-only features.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Users ─────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  name      String?
+  isDemo    Boolean  @default(false) // demo data lives under its own user, never mixed with real data
+  createdAt DateTime @default(now())
+
+  settings          Settings?
+  storageLocations  StorageLocation[]
+  orders            Order[]
+  lots              Lot[]
+  sales             Sale[]
+  localPriceReports LocalPriceReport[]
+  manualPrices      ManualPrice[]
+  sealedProducts    SealedProduct[]
+  packOpenings      PackOpening[]
+  decks             Deck[]
+  matchResults      MatchResult[]
+  metaDecks         MetaDeck[]
+  alerts            Alert[]
+  watches           WatchItem[]
+}
+
+model Settings {
+  id                     String @id @default(cuid())
+  userId                 String @unique
+  user                   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayCurrency        String @default("THB") // THB | USD | EUR
+  defaultValuationSource String @default("TCGPLAYER") // TCGPLAYER | LOCAL | CARDMARKET | MANUAL
+  fxOverrides            String @default("{}") // JSON: {"USD_THB": 3300} as rate × 100
+  conditionMultipliers   String @default("{\"NM\":100,\"LP\":85,\"MP\":70,\"HP\":50,\"DMG\":30}") // percent
+}
+
+// ───────────────────────────── Catalog ─────────────────────────────
+
+model Set {
+  id            String    @id @default(cuid())
+  code          String    @unique // e.g. OGN, SFD
+  name          String
+  releaseDate   DateTime?
+  cardCount     Int       @default(0)
+  tcgplayerId   String?
+  standardLegal Boolean   @default(true)
+  rotatesOn     DateTime? // from src/config/rotation.ts (TODO verify)
+  status        String    @default("RELEASED") // PREVIEW | RELEASED
+  sourceId      String?   @unique // Riftcodex set id
+  syncedAt      DateTime  @default(now())
+
+  cards    Card[]
+  variants CardVariant[]
+}
+
+// A game card (one rules object). Several printings (CardVariant) may share it.
+model Card {
+  id             String  @id @default(cuid())
+  key            String  @unique // normalized "name|type" — stable grouping key across printings
+  name           String
+  type           String // Legend | Unit | Spell | Gear | Battlefield | Rune | …
+  supertype      String? // Champion | Signature | Basic | Token
+  domains        String  @default("") // "|Fury|Order|" — pipe-delimited for portable LIKE filtering
+  energy         Int?
+  might          Int?
+  power          Int?
+  rulesText      String  @default("")
+  rulesTextRich  String  @default("")
+  flavourText    String?
+  rarity         String? // rarity of the base printing
+  tags           String  @default("") // "|Vi|"
+  orientation    String  @default("portrait")
+  imageUrl       String? // base printing image
+  searchName     String // lowercase, punctuation-stripped name for search
+  // first/base printing identifiers (spec §3) — each variant also stores its own
+  setId          String
+  set            Set     @relation(fields: [setId], references: [id])
+  collectorNumber Int?
+  riftboundId    String?
+  tcgplayerId    String?
+  updatedAt      DateTime @updatedAt
+
+  variants   CardVariant[]
+  deckCards  DeckCard[]
+  metaCards  MetaDeckCard[]
+  rulings    RulingEventCard[]
+
+  @@index([type])
+  @@index([setId])
+}
+
+// A printing: prices attach here, not to Card.
+model CardVariant {
+  id              String  @id @default(cuid())
+  cardId          String
+  card            Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  setId           String
+  set             Set     @relation(fields: [setId], references: [id])
+  sourceId        String? @unique // Riftcodex printing id (riftbound_id is NOT unique upstream)
+  riftboundId     String?
+  tcgplayerId     String?
+  collectorNumber Int?
+  printName       String // full upstream name, e.g. "Vi - Piltover Enforcer (Signature)"
+  rarity          String?
+  finish          String  @default("NORMAL") // NORMAL | FOIL
+  art             String  @default("STANDARD") // STANDARD | ALTERNATE | OVERNUMBERED | SIGNATURE | PROMO | METAL
+  language        String  @default("EN")
+  gradingCompany  String? // PSA | BGS | CGC | OTHER
+  grade           String?
+  imageUrl        String?
+  artist          String?
+  isUserCreated   Boolean @default(false) // graded / foreign-language variants added by the user
+  updatedAt       DateTime @updatedAt
+
+  priceSnapshots    PriceSnapshot[]
+  localPriceReports LocalPriceReport[]
+  manualPrices      ManualPrice[]
+  lots              Lot[]
+  deckCards         DeckCard[]
+  watches           WatchItem[]
+
+  @@index([cardId])
+  @@index([tcgplayerId])
+}
+
+// ───────────────────────────── Prices ─────────────────────────────
+
+model PriceSnapshot {
+  id         String      @id @default(cuid())
+  variantId  String
+  variant    CardVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  source     String // TCGPLAYER | CARDMARKET | SCRYDEX
+  day        String // YYYY-MM-DD (UTC) — idempotency key with variant+source
+  market     Int?
+  low        Int?
+  mid        Int?
+  currency   String
+  capturedAt DateTime @default(now())
+
+  @@unique([variantId, source, day])
+}
+
+model LocalPriceReport {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   CardVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  price     Int // satang
+  currency  String      @default("THB")
+  whereSeen String // Facebook group, local shop, Shopee, …
+  seenOn    DateTime
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@index([userId, variantId])
+}
+
+model ManualPrice {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   CardVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  price     Int
+  currency  String
+  note      String?
+  updatedAt DateTime    @updatedAt
+
+  @@unique([userId, variantId])
+}
+
+model FxRate {
+  id         String   @id @default(cuid())
+  base       String
+  quote      String
+  day        String // YYYY-MM-DD
+  rateE6     Int // rate × 1,000,000
+  source     String
+  capturedAt DateTime @default(now())
+
+  @@unique([base, quote, day])
+}
+
+// ───────────────────────────── Collection ─────────────────────────────
+
+model StorageLocation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  type      String   @default("BINDER") // BINDER | DECK_BOX | BULK_BOX | TOPLOADER | GRADED_CASE | OTHER
+  notes     String?
+  createdAt DateTime @default(now())
+
+  lots Lot[]
+
+  @@unique([userId, name])
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderedOn     DateTime
+  seller        String
+  currency      String
+  shipping      Int      @default(0)
+  forwardingFee Int      @default(0)
+  importTax     Int      @default(0)
+  otherFees     Int      @default(0)
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  lots Lot[]
+}
+
+model Lot {
+  id                String           @id @default(cuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId           String?
+  order             Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  packOpeningId     String?
+  packOpening       PackOpening?     @relation(fields: [packOpeningId], references: [id], onDelete: SetNull)
+  variantId         String
+  variant           CardVariant      @relation(fields: [variantId], references: [id])
+  quantity          Int
+  remainingQuantity Int
+  unitPrice         Int
+  landedUnitCost    Int // unit price + allocated share of order extras (minor units)
+  currency          String
+  condition         String           @default("NM") // NM | LP | MP | HP | DMG
+  acquiredOn        DateTime
+  storageLocationId String?
+  storageLocation   StorageLocation? @relation(fields: [storageLocationId], references: [id], onDelete: SetNull)
+  notes             String?
+  createdAt         DateTime         @default(now())
+
+  saleAllocations SaleAllocation[]
+
+  @@index([userId, variantId])
+}
+
+model Sale {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variantId String
+  quantity  Int
+  unitPrice Int
+  fees      Int      @default(0)
+  currency  String
+  soldOn    DateTime
+  buyer     String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  allocations SaleAllocation[]
+}
+
+model SaleAllocation {
+  id       String @id @default(cuid())
+  saleId   String
+  sale     Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  lotId    String
+  lot      Lot    @relation(fields: [lotId], references: [id])
+  quantity Int
+  costBasis Int // landed cost consumed
+}
+
+model SealedProduct {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  kind        String // BOOSTER_BOX | PACK | CARTON | BUNDLE | OTHER
+  setId       String?
+  tcgplayerId String?
+  quantity    Int      @default(1)
+  remaining   Int      @default(1)
+  landedUnitCost Int
+  currency    String
+  acquiredOn  DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  openings PackOpening[]
+}
+
+model PackOpening {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sealedProductId String
+  sealedProduct   SealedProduct @relation(fields: [sealedProductId], references: [id], onDelete: Cascade)
+  openedOn        DateTime
+  costBasis       Int
+  pullsValue      Int
+  currency        String
+  createdAt       DateTime      @default(now())
+
+  lots Lot[]
+}
+
+// ───────────────────────────── Decks ─────────────────────────────
+
+model Deck {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  format     String   @default("STANDARD")
+  notes      String?
+  shareToken String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  cards    DeckCard[]
+  versions DeckVersion[]
+  matches  MatchResult[]
+}
+
+model DeckCard {
+  id                 String       @id @default(cuid())
+  deckId             String
+  deck               Deck         @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  cardId             String
+  card               Card         @relation(fields: [cardId], references: [id])
+  section            String // LEGEND | CHAMPION | MAIN | RUNES | BATTLEFIELDS | SIDEBOARD
+  quantity           Int
+  preferredVariantId String?
+  preferredVariant   CardVariant? @relation(fields: [preferredVariantId], references: [id], onDelete: SetNull)
+  proxyQuantity      Int          @default(0) // copies that are proxy/borrowed (spec: isProxy)
+
+  @@unique([deckId, cardId, section])
+}
+
+model DeckVersion {
+  id        String   @id @default(cuid())
+  deckId    String
+  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  version   Int
+  snapshot  String // JSON list of {cardId, section, quantity}
+  diff      String   @default("[]") // JSON list of {cardId, name, delta}
+  createdAt DateTime @default(now())
+
+  @@unique([deckId, version])
+}
+
+model MatchResult {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deckId         String
+  deck           Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  opponentLegend String
+  result         String // WIN | LOSS | DRAW
+  eventType      String   @default("CASUAL")
+  playedOn       DateTime
+  notes          String?
+}
+
+model MetaDeck {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     String
+  placement String?
+  playedOn  DateTime?
+  format    String   @default("STANDARD")
+  archetype String
+  source    String   @default("PASTE")
+  sourceUrl String?
+  createdAt DateTime @default(now())
+
+  cards MetaDeckCard[]
+}
+
+model MetaDeckCard {
+  id         String   @id @default(cuid())
+  metaDeckId String
+  metaDeck   MetaDeck @relation(fields: [metaDeckId], references: [id], onDelete: Cascade)
+  cardId     String
+  card       Card     @relation(fields: [cardId], references: [id])
+  section    String
+  quantity   Int
+}
+
+// ───────────────────────────── Rulings & alerts ─────────────────────────────
+
+model RulingEvent {
+  id        String   @id @default(cuid())
+  type      String // ERRATA | BAN | UNBAN | ROTATION
+  title     String
+  effectiveOn DateTime
+  summary   String?
+  oldText   String?
+  newText   String?
+  sourceUrl String?
+  createdAt DateTime @default(now())
+
+  cards RulingEventCard[]
+}
+
+model RulingEventCard {
+  id       String      @id @default(cuid())
+  rulingId String
+  ruling   RulingEvent @relation(fields: [rulingId], references: [id], onDelete: Cascade)
+  cardId   String
+  card     Card        @relation(fields: [cardId], references: [id])
+
+  @@unique([rulingId, cardId])
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // RULING | PRICE_MOVE | PRICE_TARGET | DECK_NEED | NEW_SET
+  payload   String // JSON
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+model WatchItem {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variantId   String
+  variant     CardVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  targetPrice Int?
+  targetDir   String? // ABOVE | BELOW
+  movePct     Int? // alert when price moves ±X% in 7 days
+  currency    String?
+  preorderPrice Int?
+  createdAt   DateTime    @default(now())
+
+  @@unique([userId, variantId])
+}
+
+model SyncRun {
+  id         String    @id @default(cuid())
+  kind       String // CARDS | PRICES | FX
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  ok         Boolean   @default(false)
+  detail     String?
+}
