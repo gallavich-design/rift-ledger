@@ -30,15 +30,27 @@ export function printSuffix(printName: string): string | null {
   return m && KNOWN_PRINT_SUFFIXES.has(m[1].trim().toLowerCase()) ? m[1].trim() : null;
 }
 
+/**
+ * Stable grouping key stored in Card.key. FROZEN: changing this re-keys every card on the next
+ * sync, so it must not share code with search normalisation (which is free to evolve).
+ */
 export function cardKey(p: Pick<ProviderPrinting, "name" | "type">): string {
-  return `${normalizeForSearch(baseName(p.name))}|${p.type.toLowerCase()}`;
+  const name = baseName(p.name)
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return `${name}|${p.type.toLowerCase()}`;
 }
 
+/** Search normalisation: "Kai'Sa" → "kaisa", "Sett, Brawler" → "sett brawler". */
 export function normalizeForSearch(s: string): string {
   return s
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
+    .replace(/['’`]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }

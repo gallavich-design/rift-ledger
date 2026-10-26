@@ -11,14 +11,14 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@radix-ui/react-slot": "^1.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "fuse.js": "^7.5.0",
     "lucide-react": "^1.61.0",
     "next": "15.5.28",
     "react": "19.1.0",

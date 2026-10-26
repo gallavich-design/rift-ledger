@@ -120,6 +120,11 @@ export async function syncCatalog(db: PrismaClient, provider: CardDataProvider, 
     );
     if (removable.length) await db.cardVariant.deleteMany({ where: { id: { in: removable.map((v) => v.id) } } });
 
+    // Cards left with no printings (e.g. upstream regrouped a name) and nothing pointing at them.
+    await db.card.deleteMany({
+      where: { variants: { none: {} }, deckCards: { none: {} }, metaCards: { none: {} }, rulings: { none: {} } },
+    });
+
     const result: SyncResult = {
       sets: setIdByCode.size,
       cards: groups.length,

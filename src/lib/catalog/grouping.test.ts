@@ -110,7 +110,18 @@ describe("search ranking", () => {
     setCode: "X",
   });
   const idx = buildIndex(
-    ["Master Yi - Honed", "Master Yi - Wuju Master", "Jinx - Loose Cannon", "Vi - Piltover Enforcer", "Yasuo - Unforgiven", "Card D"].map(doc),
+    [
+      "Master Yi - Honed",
+      "Master Yi - Wuju Master",
+      "Jinx - Loose Cannon",
+      "Vi - Piltover Enforcer",
+      "Yasuo - Unforgiven",
+      "Dominus",
+      "Windsinger",
+      "Hexdrinker",
+      "Draven - Showboat",
+      "Card D",
+    ].map(doc),
   );
 
   it.each([
@@ -119,8 +130,28 @@ describe("search ranking", () => {
     ["jinks loose canon", "Jinx - Loose Cannon"],
     ["piltover enforcr", "Vi - Piltover Enforcer"],
     ["yasou", "Yasuo - Unforgiven"],
+    ["jinks", "Jinx - Loose Cannon"],
+    ["draven showbot", "Draven - Showboat"],
   ])("finds %s in top 3", (q, expected) => {
     const top3 = rankSearch(idx, q, 3).map((d) => d.name);
     expect(top3).toContain(expected);
+  });
+});
+
+describe("osaDistance", () => {
+  it("counts a transposition as one edit", async () => {
+    const { osaDistance } = await import("./search");
+    expect(osaDistance("yasou", "yasuo")).toBe(1);
+    expect(osaDistance("jinks", "jinx")).toBe(2);
+    expect(osaDistance("", "abc")).toBe(3);
+  });
+});
+
+describe("search precision", () => {
+  it("returns nothing for gibberish", () => {
+    const idx = buildIndex(["Master Yi - Honed", "Jinx - Loose Cannon"].map((name) => ({
+      id: name, name, searchName: normalizeForSearch(name), type: "Unit", supertype: null, domains: "", tags: "", imageUrl: null, setCode: "X",
+    })));
+    expect(rankSearch(idx, "qqqzzz")).toEqual([]);
   });
 });
