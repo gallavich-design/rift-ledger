@@ -9,6 +9,8 @@ import { STORAGE_TYPE_LABEL, type StorageType } from "@/lib/domain/enums";
 import { LocationForm } from "./LocationForm";
 import { LocationRow } from "./LocationRow";
 import { SyncButton } from "./SyncButton";
+import { DataSection } from "./DataSection";
+import { userHasData } from "@/lib/data/exportImport";
 
 export const metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
@@ -34,6 +36,7 @@ export default async function SettingsPage() {
   const priceDetail = lastPrices?.detail ? (JSON.parse(lastPrices.detail) as { day: string; snapshots: number; unmatchedPrices: number }) : null;
   const valuationSources = [...new Set([...sources, "LOCAL"])].filter((s) => s !== "CARDMARKET" || sources.includes(s));
   const [cardCount, variantCount] = counts;
+  const hasData = await userHasData(db, userId);
 
   return (
     <div className="mx-auto max-w-[880px] px-4 py-6 md:px-8 md:py-8">
@@ -129,6 +132,10 @@ export default async function SettingsPage() {
             ))}
           </ul>
         )}
+      </Section>
+
+      <Section id="data" title="Your data" description="Download a full backup, or move your collection to another install. Exports never include demo data.">
+        <DataSection demo={demo} hasData={hasData} />
       </Section>
 
       <Section
