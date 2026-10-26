@@ -198,7 +198,10 @@ export async function loadLotsAndSales(db: PrismaClient, userId: string) {
 export async function loadVariantInfo(db: PrismaClient, variantIds: string[]) {
   const vs = await db.cardVariant.findMany({
     where: { id: { in: variantIds } },
-    include: { card: { select: { id: true, name: true, domains: true, type: true, orientation: true } }, set: { select: { code: true, name: true, rotatesOn: true } } },
+    include: {
+      card: { select: { id: true, name: true, domains: true, type: true, orientation: true, set: { select: { code: true, rotatesOn: true } } } },
+      set: { select: { code: true, name: true, rotatesOn: true } },
+    },
   });
   return new Map(
     vs.map((v) => [
@@ -213,6 +216,9 @@ export async function loadVariantInfo(db: PrismaClient, variantIds: string[]) {
         setCode: v.set.code,
         setName: v.set.name,
         rotatesOn: v.set.rotatesOn,
+        // Standard legality follows the card's own (base) set, not a later reprint's
+        cardSetCode: v.card.set.code,
+        cardRotatesOn: v.card.set.rotatesOn ? dayKey(v.card.set.rotatesOn) : null,
         collectorNumber: v.collectorNumber,
         rarity: v.rarity ?? "—",
         art: v.art,

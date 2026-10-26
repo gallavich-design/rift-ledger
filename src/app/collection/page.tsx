@@ -40,6 +40,9 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
   const variantIds = [...new Set(openLots.map((l) => l.variantId))];
   const [info, prices] = await Promise.all([loadVariantInfo(db, variantIds), getPriceBook(db, userId, variantIds, source)]);
   const setCodes = [...new Set([...info.values()].map((v) => v.setCode))].sort();
+  const metaRows = await db.metaDeckCard.findMany({ where: { metaDeck: { userId }, cardId: { in: [...new Set([...info.values()].map((v) => v.cardId))] } }, select: { cardId: true, metaDeckId: true } });
+  const metaCount = new Map<string, Set<string>>();
+  for (const m of metaRows) metaCount.set(m.cardId, (metaCount.get(m.cardId) ?? new Set()).add(m.metaDeckId));
 
   if (fx.missing.includes(display) || (display !== "USD" && fx.missing.length && lots.some((l) => l.currency !== display))) {
     return (
@@ -136,7 +139,15 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
                             {ART_LABEL[v.art as VariantArt]} · {v.finish === "FOIL" ? "Foil" : "Normal"}
                             {v.graded && <> · {v.graded}</>}
                           </span>
-                          <span className="mt-0.5 block truncate text-xs text-ink-3">{where.join(", ")}</span>
+                          <span className="mt-0.5 block truncate text-xs text-ink-3">
+                            {where.join(", ")}
+                            {metaCount.get(v.cardId)?.size ? (
+                              <span className="text-quill">
+                                {" "}
+                                · in {metaCount.get(v.cardId)!.size} meta {metaCount.get(v.cardId)!.size === 1 ? "deck" : "decks"}
+                              </span>
+                            ) : null}
+                          </span>
                         </span>
                       </Link>
                       <span className="num text-sm text-ink-3 md:text-right md:text-ink">

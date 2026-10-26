@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { CardArt } from "@/components/cards/bits";
 import { DomainStripe } from "@/components/cards/DomainStripe";
 import { cn } from "@/lib/ui";
+import { nextRotation, rotationLabel } from "@/lib/rulings/rotation";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Decks" };
@@ -57,6 +58,8 @@ export default async function DecksPage() {
             const lc = legend ? cards.get(legend.cardId) : undefined;
             const wr = winRates(d.matches).overall;
             const pending = (JSON.parse(d.pendingImportLines) as unknown[]).length;
+            const rot = nextRotation(today, lines.map((l) => cards.get(l.cardId)?.rotatesOn));
+            const hasBanned = v.issues.some((i) => i.rule === "BANNED");
             return (
               <li key={d.id}>
                 <Link href={`/decks/${d.id}`} className="flex gap-4 rounded-[var(--radius-panel)] border border-rule bg-sheet p-4 hover:border-rule-strong" data-testid="deck-card">
@@ -90,6 +93,8 @@ export default async function DecksPage() {
                     <span className="mt-2 block text-xs text-ink-3">
                       <span className="num">{c.ownedCopies}</span>/<span className="num">{c.copies}</span> cards owned
                       {pending > 0 && <span className="text-caution"> · {pending} import lines to fix</span>}
+                      {hasBanned && <span className="font-medium text-loss"> · ✕ has a banned card</span>}
+                      {rot && <span> · {rotationLabel(today, rot)}</span>}
                     </span>
                   </span>
                 </Link>

@@ -29,6 +29,7 @@ export async function syncCatalog(db: PrismaClient, provider: CardDataProvider, 
     // Sets
     const setIdByCode = new Map<string, string>();
     for (const s of sets) {
+      const ruled = await db.rulingEvent.findFirst({ where: { type: "ROTATION", setCode: s.code }, orderBy: { createdAt: "desc" } });
       const rotates = ROTATION_DATES[s.code];
       const data = {
         name: s.name,
@@ -37,7 +38,7 @@ export async function syncCatalog(db: PrismaClient, provider: CardDataProvider, 
         tcgplayerId: s.tcgplayerId,
         sourceId: s.sourceId,
         status: s.releaseDate && s.releaseDate > now ? "PREVIEW" : "RELEASED",
-        rotatesOn: rotates ? new Date(`${rotates}T00:00:00Z`) : null,
+        rotatesOn: ruled ? ruled.effectiveOn : rotates ? new Date(`${rotates}T00:00:00Z`) : null,
         standardLegal: !NON_STANDARD_SET_CODES.has(s.code),
         syncedAt: now,
       };

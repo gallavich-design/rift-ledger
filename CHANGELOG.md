@@ -1,5 +1,41 @@
 # Changelog
 
+## Phase 4 — Rulings, alerts & meta (2026-10-26)
+
+### Schema migration `phase4_rulings_watch_alerts_meta`
+- `RulingEvent.setCode` (rotation rulings apply to a set), `WatchItem.lastSide` / `lastMoveAlertDay` /
+  `deckId`, `Alert.dedupeKey` (unique per user), `MetaDeck.pendingImportLines`. All nullable or defaulted;
+  no data rewritten. Generated with `prisma migrate diff` and applied with `migrate deploy`, because
+  `migrate dev` needs an interactive terminal to accept the (harmless) uniqueness warning.
+
+### Added
+- News & Alerts: alerts inbox (unread badge in the nav), rulings feed, "Add ruling" for errata, bans,
+  unbans and rotations, and a ruling page with the errata diff, affected cards you own/play and the
+  30-days-before vs after price impact.
+- A ruling alerts every user who owns an affected card or has it in a deck (one alert per ruling).
+- Decks: "✕ X banned — deck no longer legal", "⚠ N cards errata'd on date" and "↻ N cards rotate in
+  N months" badges, on the deck and the decks list. Bans feed the legality checker.
+- Rotation: a set's date comes from its latest rotation ruling, else `config/rotation.ts`. Shown on
+  cards ("OGN rotates in 14 months"), decks, and the dashboard (value of your cards that rotate, by date).
+- Watchlist: watch any printing with a target (at or below / at or above), a ±% in 7 days move, and
+  a pre-order price. Alerts fire when the price crosses the target (not every day it stays past it),
+  checked after the daily price job and whenever you enter a manual or local price. Still-to-buy
+  cards on a deck link to a watch that remembers the deck ("a card your deck needs").
+- Pre-release: banner for sets in preview and for 4 weeks after each release; "price since release"
+  (pre-order → week 1 → week 4 → now) on card pages.
+- Meta ("What can I build?"): paste-import tournament lists with event, placement and date; each shows
+  % owned, missing copies, cost to complete (normal and budget); sort by cheapest / % owned / newest,
+  filter by Legend, domain and date; one-click copy to your decks. Cards show "in N meta decks".
+- Phone navigation: four tabs (Dashboard, Collection, Decks, Alerts) plus a More menu.
+
+### Fixed
+- Bans dated "today" didn't apply until 19:00 Bangkok time (dates are now compared as calendar days).
+
+### Tests
+- 115 unit tests (watch crossing rules, errata diff, rotation, price impact, meta summary/sorting).
+- 32 browser checks across Phases 1–4 (6 new).
+
+
 ## Phase 3 — Decks (2026-10-26)
 
 ### Schema migration `phase3_deck_pending_import_lines`

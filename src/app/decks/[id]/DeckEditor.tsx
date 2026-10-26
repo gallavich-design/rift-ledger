@@ -30,6 +30,7 @@ interface Props {
   today: string;
   currency: string;
   sourceLabel: string;
+  notices: { errata: { date: string; count: number }[]; rotation: { date: string; label: string; cards: number } | null };
 }
 
 const TARGET: Partial<Record<Section, string>> = {
@@ -173,6 +174,27 @@ export function DeckEditor(p: Props) {
             </Button>
           </div>
         </div>
+        {(p.notices.errata.length > 0 || p.notices.rotation || validation.issues.some((i) => i.rule === "BANNED")) && (
+          <ul className="mt-2 flex flex-wrap gap-2 text-xs" data-testid="deck-notices">
+            {validation.issues
+              .filter((i) => i.rule === "BANNED")
+              .map((i) => (
+                <li key={i.message} className="rounded-full bg-loss-tint px-2.5 py-1 font-medium text-loss">
+                  ✕ {i.message.replace(" is banned.", "")} banned — deck no longer legal
+                </li>
+              ))}
+            {p.notices.errata.map((e) => (
+              <li key={e.date} className="rounded-full bg-caution-tint px-2.5 py-1 font-medium text-caution">
+                ⚠ {e.count} {e.count === 1 ? "card" : "cards"} in this deck errata&apos;d on {e.date}
+              </li>
+            ))}
+            {p.notices.rotation && (
+              <li className="rounded-full bg-inset px-2.5 py-1 text-ink-2">
+                ↻ {p.notices.rotation.cards} {p.notices.rotation.cards === 1 ? "card" : "cards"} {p.notices.rotation.label}
+              </li>
+            )}
+          </ul>
+        )}
         {msg && !dirty && (
           <p role="status" className={cn("mt-1 text-sm", msg.ok ? "text-gain" : "text-loss")}>
             {msg.text}
@@ -391,7 +413,10 @@ export function DeckEditor(p: Props) {
                     .map((l) => (
                       <li key={l.cardId} className="flex justify-between gap-3">
                         <span className="min-w-0 truncate">
-                          <span className="num">{l.missing}×</span> {names.get(l.cardId)}
+                          <span className="num">{l.missing}×</span>{" "}
+                          <Link href={`/cards/${l.cardId}?deck=${p.deckId}#watch`} className="hover:text-quill hover:underline" title="Watch the price">
+                            {names.get(l.cardId)}
+                          </Link>
                           {l.proxies > 0 && <span className="text-ink-3"> ({l.proxies} proxied)</span>}
                         </span>
                         <span className="num shrink-0 text-ink-2">{l.normal?.unit != null ? fmt(l.missingCost) : "—"}</span>

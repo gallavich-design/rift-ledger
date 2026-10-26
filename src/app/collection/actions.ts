@@ -8,6 +8,7 @@ import { allocateLandedCost } from "@/lib/money/landedCost";
 import { consumeFifo, InsufficientQuantityError } from "@/lib/money/fifo";
 import { CONDITIONS, CURRENCIES } from "@/lib/domain/enums";
 import { dayKey, dayToDate } from "@/config/app";
+import { evaluateWatches } from "@/lib/alerts/service";
 
 export type Result<T = undefined> = { ok: true; data: T; message?: string } | { ok: false; message: string; fieldErrors?: Record<string, string> };
 
@@ -232,6 +233,7 @@ export async function reportLocalPrice(payload: LocalPayload): Promise<Result> {
   await db.localPriceReport.create({
     data: { userId, variantId: p.variantId, price: p.price, currency: "THB", whereSeen: p.whereSeen, seenOn: dayToDate(p.seenOn), note: p.note || null },
   });
+  await evaluateWatches(db, { userId, variantIds: [p.variantId] });
   refresh();
   return { ok: true, data: undefined, message: "Local price saved." };
 }
@@ -264,6 +266,7 @@ export async function setManualPrice(payload: ManualPayload): Promise<Result> {
       create: { variantId: m.variantId, source: "MANUAL", day: today, market: m.price, currency: m.currency },
     }),
   ]);
+  await evaluateWatches(db, { userId, variantIds: [m.variantId] });
   refresh();
   return { ok: true, data: undefined, message: "Manual price set — it overrides every source for this printing." };
 }
@@ -271,6 +274,7 @@ export async function setManualPrice(payload: ManualPayload): Promise<Result> {
 export async function clearManualPrice(variantId: string): Promise<Result> {
   const userId = await getCurrentUserId();
   await db.manualPrice.deleteMany({ where: { userId, variantId } });
+  await evaluateWatches(db, { userId, variantIds: [variantId] });
   refresh();
   return { ok: true, data: undefined, message: "Manual price removed." };
 }

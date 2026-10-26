@@ -2,18 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search } from "lucide-react";
+import { MoreHorizontal, Search } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/ui";
 import { CURRENT_PHASE, NAV } from "./nav";
 import { CommandPalette } from "./CommandPalette";
 import { DemoBanner } from "./DemoBanner";
 
-export function AppShell({ children, demo = false }: { children: React.ReactNode; demo?: boolean }) {
+export function AppShell({ children, demo = false, unread = 0 }: { children: React.ReactNode; demo?: boolean; unread?: number }) {
   const pathname = usePathname();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
   const ready = NAV.filter((n) => n.readyIn <= CURRENT_PHASE);
+  const PRIMARY = ["/dashboard", "/collection", "/decks", "/news"];
+  const primary = PRIMARY.map((h) => ready.find((n) => n.href === h)).filter((n): n is (typeof NAV)[number] => !!n);
+  const secondary = ready.filter((n) => !PRIMARY.includes(n.href));
+  const [moreOpen, setMoreOpen] = useState(false);
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)]">
@@ -67,7 +71,13 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
                     )}
                   >
                     <Icon size={16} aria-hidden className={active ? "text-quill" : undefined} />
-                    {item.label}
+                    <span className="flex-1">{item.label}</span>
+                    {item.href === "/news" && unread > 0 && (
+                      <span className="num rounded-full bg-quill px-1.5 py-px text-[11px] font-medium text-quill-ink" data-testid="unread-badge">
+                        {unread}
+                        <span className="sr-only"> unread</span>
+                      </span>
+                    )}
                   </Link>
                 </li>
               );
@@ -95,28 +105,66 @@ export function AppShell({ children, demo = false }: { children: React.ReactNode
         {children}
       </main>
 
-      {/* Mobile bottom tab bar — only built screens */}
-      <nav
-        aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-rule bg-sheet pb-[env(safe-area-inset-bottom)] md:hidden"
-      >
-        <ul className="grid" style={{ gridTemplateColumns: `repeat(${ready.length}, minmax(0, 1fr))` }}>
-          {ready.map((item) => {
+      {/* Mobile bottom tab bar: four primary screens + More (spec §6) */}
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-20 border-t border-rule bg-sheet pb-[env(safe-area-inset-bottom)] md:hidden">
+        {moreOpen && (
+          <div className="border-b border-rule bg-sheet px-2 py-2" id="more-menu">
+            <ul className="grid grid-cols-2 gap-1">
+              {secondary.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setMoreOpen(false)}
+                      aria-current={isActive(item.href) ? "page" : undefined}
+                      className={cn("flex h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm", isActive(item.href) ? "bg-quill-tint text-quill" : "text-ink-2 hover:bg-hover")}
+                    >
+                      <Icon size={17} aria-hidden />
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        <ul className="grid grid-cols-5">
+          {primary.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  onClick={() => setMoreOpen(false)}
                   aria-current={active ? "page" : undefined}
-                  className={cn("flex h-14 flex-col items-center justify-center gap-1 text-[11px]", active ? "text-quill" : "text-ink-3")}
+                  className={cn("relative flex h-14 flex-col items-center justify-center gap-1 text-[11px]", active ? "text-quill" : "text-ink-3")}
                 >
                   <Icon size={19} aria-hidden />
-                  {item.label}
+                  {item.label === "News & Alerts" ? "Alerts" : item.label}
+                  {item.href === "/news" && unread > 0 && (
+                    <span className="num absolute top-1.5 left-1/2 ml-1.5 rounded-full bg-quill px-1 text-[10px] font-medium text-quill-ink">
+                      {unread}
+                      <span className="sr-only"> unread</span>
+                    </span>
+                  )}
                 </Link>
               </li>
             );
           })}
+          <li>
+            <button
+              type="button"
+              aria-expanded={moreOpen}
+              aria-controls="more-menu"
+              onClick={() => setMoreOpen((o) => !o)}
+              className={cn("flex h-14 w-full flex-col items-center justify-center gap-1 text-[11px]", moreOpen || secondary.some((i) => isActive(i.href)) ? "text-quill" : "text-ink-3")}
+            >
+              <MoreHorizontal size={19} aria-hidden />
+              More
+            </button>
+          </li>
         </ul>
       </nav>
 

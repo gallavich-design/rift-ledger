@@ -93,11 +93,15 @@ export async function loadOwned(db: PrismaClient, userId: string, cardIds: strin
 
 /** Banned card names right now (Phase 4 rulings feed). The config list is merged in by the validator. */
 export async function loadBannedNames(db: PrismaClient): Promise<string[]> {
-  const events = await db.rulingEvent.findMany({
-    where: { type: { in: ["BAN", "UNBAN"] }, effectiveOn: { lte: new Date() } },
-    orderBy: { effectiveOn: "asc" },
-    include: { cards: { include: { card: { select: { name: true } } } } },
-  });
+  // Compare calendar days (Asia/Bangkok), not instants: a ban "on 26 Oct" applies all of 26 Oct.
+  const today = dayKey();
+  const events = (
+    await db.rulingEvent.findMany({
+      where: { type: { in: ["BAN", "UNBAN"] } },
+      orderBy: [{ effectiveOn: "asc" }, { createdAt: "asc" }],
+      include: { cards: { include: { card: { select: { name: true } } } } },
+    })
+  ).filter((e) => dayKey(e.effectiveOn) <= today);
   const state = new Map<string, boolean>();
   for (const e of events) for (const c of e.cards) state.set(c.card.name, e.type === "BAN");
   return [...state.entries()].filter(([, b]) => b).map(([n]) => n);

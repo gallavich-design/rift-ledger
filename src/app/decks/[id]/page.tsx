@@ -18,6 +18,8 @@ import { LineChart } from "@/components/charts/LineChart";
 import { FxMissing } from "@/components/money/FxMissing";
 import { cn } from "@/lib/ui";
 import { DeckEditor } from "./DeckEditor";
+import { deckRulingBadges } from "@/lib/rulings/service";
+import { nextRotation, rotationLabel } from "@/lib/rulings/rotation";
 import { DeleteMatchButton, ExportShare, MatchForm, PendingImport, RestoreButton } from "./DeckSide";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +82,17 @@ export default async function DeckPage({ params }: { params: Promise<{ id: strin
   });
 
   const wr = winRates(deck.matches);
+  const badges = await deckRulingBadges(db, cardIds);
+  const nextRot = nextRotation(today, [...cards.values()].map((c) => c.rotatesOn));
+  const notices = {
+    errata: badges.errata,
+    rotation: nextRot
+      ? (() => {
+          const n = [...cards.values()].filter((c) => c.rotatesOn === nextRot).length;
+          return { date: nextRot, label: rotationLabel(today, nextRot, n !== 1), cards: n };
+        })()
+      : null,
+  };
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6 md:px-8 md:py-8">
@@ -100,6 +113,7 @@ export default async function DeckPage({ params }: { params: Promise<{ id: strin
         today={today}
         currency={display}
         sourceLabel={SOURCE_LABEL[settings.defaultValuationSource] ?? settings.defaultValuationSource}
+        notices={notices}
       />
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">

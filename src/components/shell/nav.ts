@@ -36,4 +36,4 @@ export const NAV: NavItem[] = [
   { label: "Settings", href: "/settings", icon: Settings, readyIn: 1 },
 ];
 
-export const CURRENT_PHASE = 3;
+export const CURRENT_PHASE = 4;

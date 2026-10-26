@@ -9,6 +9,7 @@ import { DOMAIN_ORDER, domainColor } from "@/config/domains";
 import { cn } from "@/lib/ui";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { NewSetBanner } from "@/components/shell/NewSetBanner";
 
 export const metadata = { title: "Cards" };
 export const dynamic = "force-dynamic";
@@ -96,6 +97,7 @@ export default async function CardsPage({ searchParams }: { searchParams: Promis
         />
       ) : (
         <>
+          <NewSetBanner />
           <div className="space-y-3">
             <SearchField defaultValue={q} />
             <FilterRow label="Set">

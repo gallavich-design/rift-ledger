@@ -357,6 +357,7 @@ model Deck {
   cards    DeckCard[]
   versions DeckVersion[]
   matches  MatchResult[]
+  watches  WatchItem[]
 }
 
 model DeckCard {
@@ -410,6 +411,7 @@ model MetaDeck {
   archetype String
   source    String   @default("PASTE")
   sourceUrl String?
+  pendingImportLines String @default("[]") // JSON: lines from the pasted list that matched no card
   createdAt DateTime @default(now())
 
   cards MetaDeckCard[]
@@ -431,6 +433,7 @@ model RulingEvent {
   id        String   @id @default(cuid())
   type      String // ERRATA | BAN | UNBAN | ROTATION
   title     String
+  setCode   String? // ROTATION: the set leaving Standard (cards are implied)
   effectiveOn DateTime
   summary   String?
   oldText   String?
@@ -456,10 +459,12 @@ model Alert {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      String // RULING | PRICE_MOVE | PRICE_TARGET | DECK_NEED | NEW_SET
-  payload   String // JSON
+  payload   String // JSON: { title, body, href, ... }
+  dedupeKey String? // same key → same alert; prevents duplicates when jobs re-run
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
+  @@unique([userId, dedupeKey])
   @@index([userId, read])
 }
 
@@ -474,6 +479,10 @@ model WatchItem {
   movePct     Int? // alert when price moves ±X% in 7 days
   currency    String?
   preorderPrice Int?
+  lastSide    String? // ABOVE | BELOW the target at the last check — alerts fire on a crossing
+  lastMoveAlertDay String? // YYYY-MM-DD of the last ±X% move alert
+  deckId      String? // set when the watch was made for a card a deck still needs
+  deck        Deck?       @relation(fields: [deckId], references: [id], onDelete: SetNull)
   createdAt   DateTime    @default(now())
 
   @@unique([userId, variantId])

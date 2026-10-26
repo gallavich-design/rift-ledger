@@ -27,6 +27,13 @@
   state they're excluded, so the validator doesn't invent a rule. Revisit with the full rules.
 - One physical copy used in two decks counts as owned in both.
 
+## Deferred from Phase 4
+- Rulings are entered by hand (spec v1). Automatic checking of Riot's announcements is listed under
+  Future.
+- Price impact needs 30 days of daily prices either side of a ruling, so it fills in over time.
+- Prisma `migrate dev` stops on warnings in a non-interactive shell; schema changes with warnings are
+  generated with `prisma migrate diff` and applied with `migrate deploy` (see CHANGELOG, Phase 4).
+
 ## Verify before relying on them (`TODO verify`)
 - `src/config/gameRules.ts` — sourced from Core Rules §103 on 2026-10-26; only the sideboard size (0 or 8) is still `TODO verify`.
 - `src/config/rotation.ts` — rotation dates and which set codes count as Sets 1–5.

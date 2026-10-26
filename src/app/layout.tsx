@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Thai } from "next/font/google";
 import { AppShell } from "@/components/shell/AppShell";
-import { isDemoMode } from "@/lib/currentUser";
+import { getCurrentUserId, isDemoMode } from "@/lib/currentUser";
+import { db } from "@/lib/db";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({ variable: "--font-plex-sans", subsets: ["latin"], weight: ["400", "500", "600"] });
@@ -20,10 +21,16 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  let unread = 0;
+  try {
+    unread = await db.alert.count({ where: { userId: await getCurrentUserId(), read: false } });
+  } catch {
+    unread = 0; // database not migrated yet — the shell still renders
+  }
   return (
     <html lang="en" className={`${plexSans.variable} ${plexThai.variable} ${plexMono.variable}`}>
       <body>
-        <AppShell demo={await isDemoMode()}>{children}</AppShell>
+        <AppShell demo={await isDemoMode()} unread={unread}>{children}</AppShell>
       </body>
     </html>
   );

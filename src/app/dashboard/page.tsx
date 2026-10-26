@@ -26,6 +26,8 @@ import { DomainStripe } from "@/components/cards/DomainStripe";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/ui";
+import { NewSetBanner } from "@/components/shell/NewSetBanner";
+import { monthsUntil, rotationLabel } from "@/lib/rulings/rotation";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
@@ -115,8 +117,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const fxNote = display !== "USD" && fx.rates.find((r) => r.quote === display);
 
+  // Rotation: value of cards you own that leave Standard, grouped by date (next 3 years).
+  const rotating = new Map<string, { value: number; copies: number; sets: Set<string> }>();
+  for (const p of positions) {
+    const v = get(p.variantId);
+    if (!v.cardRotatesOn || v.cardRotatesOn <= today || monthsUntil(today, v.cardRotatesOn) > 36) continue;
+    const e = rotating.get(v.cardRotatesOn) ?? { value: 0, copies: 0, sets: new Set<string>() };
+    e.value += p.value ?? 0;
+    e.copies += p.quantity;
+    e.sets.add(v.cardSetCode);
+    rotating.set(v.cardRotatesOn, e);
+  }
+  const rotatingRows = [...rotating.entries()].sort(([a], [b]) => a.localeCompare(b));
+
   return (
     <Shell sources={sources} source={source} display={display}>
+      <NewSetBanner />
       {/* Headline: one hero number, then a ledger strip — not five identical tiles */}
       <section aria-label="Portfolio summary" className="grid gap-6 border-b border-rule pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] lg:items-end">
         <div>
@@ -164,6 +180,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </Stat>
         </dl>
       </section>
+
+      {rotatingRows.length > 0 && (
+        <section aria-label="Rotation" className="mt-4 flex flex-wrap gap-2" data-testid="rotation-value">
+          {rotatingRows.map(([date, r]) => (
+            <p key={date} className="rounded-[var(--radius-panel)] border border-rule bg-sheet px-4 py-2.5 text-sm">
+              <span className="num font-medium">{formatMoney(r.value, display)}</span>
+              <span className="text-ink-2">
+                {" "}
+                of your cards ({r.copies} {r.copies === 1 ? "copy" : "copies"}, {[...r.sets].sort().join(", ")}) {rotationLabel(today, date, true)}
+              </span>{" "}
+              <span className="num text-xs text-ink-3">· {date}</span>
+            </p>
+          ))}
+        </section>
+      )}
 
       <section aria-labelledby="chart-h" className="mt-6 rounded-[var(--radius-panel)] border border-rule bg-sheet p-4 sm:p-5">
         <h2 id="chart-h" className="mb-3 text-base font-semibold">

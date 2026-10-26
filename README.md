@@ -104,6 +104,16 @@ document them in `.env.example`.
   `bannedCardNames`, or enter a ban in News & Alerts (Phase 4).
 - Proxies count toward legality but never as owned, so they appear in cost to complete.
 
+## Rulings, alerts and the watchlist
+
+- **News & Alerts → Add ruling** records errata, bans, unbans and rotations. Owners and players of the
+  affected cards get one alert each; bans make decks illegal immediately; a rotation ruling sets that
+  set's rotation date (overriding `config/rotation.ts`).
+- **Watch** a printing from its card page. Target alerts fire when the price crosses the target;
+  ±% move alerts at most once a week. Watches are checked by the daily price job and right after you
+  enter a manual or local price.
+- **Meta**: paste tournament lists to see % owned and cost to complete against your collection.
+
 ## Where things live
 
 - `src/config/gameRules.ts` — every deck-construction rule (values marked `TODO verify`)

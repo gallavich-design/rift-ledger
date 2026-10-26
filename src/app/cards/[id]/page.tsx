@@ -21,6 +21,11 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/ui";
 import { Disclosure, LocalPriceForm, ManualPriceForm, MoveLotSelect } from "./PriceForms";
 import { AddToDeck } from "./AddToDeck";
+import { WatchForm } from "./WatchForm";
+import { ErrataDiff } from "@/components/cards/ErrataDiff";
+import { RULING_LABEL, type RulingType } from "@/lib/rulings/service";
+import { rotationLabel } from "@/lib/rulings/rotation";
+import { addDays } from "@/config/app";
 import { SECTION_LABEL, type Section } from "@/lib/decks/types";
 
 export const dynamic = "force-dynamic";
@@ -36,9 +41,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: card?.name ?? "Card" };
 }
 
-export default async function CardPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ v?: string }> }) {
+export default async function CardPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ v?: string; deck?: string }> }) {
   const { id } = await params;
-  const { v } = await searchParams;
+  const { v, deck: watchDeckId } = await searchParams;
   const card = await load(id);
   if (!card) notFound();
   const userId = await getCurrentUserId();
@@ -56,7 +61,7 @@ export default async function CardPage({ params, searchParams }: { params: Promi
   );
   const variantIds = variants.map((x) => x.id);
 
-  const [snaps, localReports, manual, lots, locations, importLines, myDecks, usedIn] = await Promise.all([
+  const [snaps, localReports, manual, lots, locations, importLines, myDecks, usedIn, rulings, metaCount, watches] = await Promise.all([
     db.priceSnapshot.findMany({ where: { variantId: { in: variantIds } }, orderBy: { day: "asc" } }),
     db.localPriceReport.findMany({ where: { userId, variantId: { in: variantIds } }, orderBy: [{ seenOn: "asc" }, { createdAt: "asc" }] }),
     db.manualPrice.findMany({ where: { userId, variantId: { in: variantIds } } }),
@@ -65,6 +70,12 @@ export default async function CardPage({ params, searchParams }: { params: Promi
     db.lot.findMany({ where: { userId, order: { currency: "USD" } }, select: { quantity: true, unitPrice: true, landedTotal: true } }),
     db.deck.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, select: { id: true, name: true } }),
     db.deckCard.findMany({ where: { cardId: card.id, deck: { userId } }, include: { deck: { select: { id: true, name: true } } } }),
+    db.rulingEvent.findMany({
+      where: { OR: [{ cards: { some: { cardId: card.id } } }, { type: "ROTATION", setCode: card.set.code }] },
+      orderBy: [{ effectiveOn: "desc" }, { createdAt: "desc" }],
+    }),
+    db.metaDeck.count({ where: { userId, cards: { some: { cardId: card.id } } } }),
+    db.watchItem.findMany({ where: { userId, variantId: { in: variantIds } } }),
   ]);
 
   const heldByVariant = new Map<string, number>();
@@ -143,6 +154,25 @@ export default async function CardPage({ params, searchParams }: { params: Promi
   const latestTcgByVariant = new Map<string, (typeof snaps)[number]>();
   for (const s of snaps) if (s.source === "TCGPLAYER") latestTcgByVariant.set(s.variantId, s);
   const selectedHeld = heldByVariant.get(selected.id) ?? 0;
+  const watch = watches.find((w) => w.variantId === selected.id) ?? null;
+  const watchDeck = watchDeckId ? (myDecks.find((d) => d.id === watchDeckId) ?? null) : null;
+  const rotatesOn = card.set.rotatesOn ? dayKey(card.set.rotatesOn) : null;
+  const errata = rulings.find((r) => r.type === "ERRATA" && r.newText);
+
+  // Price since release (spec §4.4): pre-order → week 1 → week 4 → now, for the selected printing.
+  const release = selected.set.releaseDate ? dayKey(selected.set.releaseDate) : null;
+  const tcgSel = selSnaps.filter((s) => s.source === "TCGPLAYER" && (s.market ?? s.mid ?? s.low) != null);
+  const atOrAfter = (d: string) => tcgSel.find((s) => s.day >= d);
+  const beforeRelease = release ? tcgSel.filter((s) => s.day < release).at(-1) : undefined;
+  const sinceRelease =
+    release && Date.parse(release) > Date.now() - 400 * 86_400_000
+      ? [
+          { label: "Pre-order", amount: watch?.preorderPrice != null ? { a: watch.preorderPrice, c: watch.currency ?? display } : beforeRelease ? { a: beforeRelease.market ?? beforeRelease.mid ?? beforeRelease.low!, c: beforeRelease.currency } : null },
+          { label: "Week 1", amount: (() => { const s = atOrAfter(addDays(release, 7)); return s && s.day <= addDays(release, 13) ? { a: s.market ?? s.mid ?? s.low!, c: s.currency } : null; })() },
+          { label: "Week 4", amount: (() => { const s = atOrAfter(addDays(release, 28)); return s && s.day <= addDays(release, 41) ? { a: s.market ?? s.mid ?? s.low!, c: s.currency } : null; })() },
+          { label: "Now", amount: tcgSel.at(-1) ? { a: tcgSel.at(-1)!.market ?? tcgSel.at(-1)!.mid ?? tcgSel.at(-1)!.low!, c: tcgSel.at(-1)!.currency } : null },
+        ]
+      : null;
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6 md:px-8 md:py-8">
@@ -167,6 +197,21 @@ export default async function CardPage({ params, searchParams }: { params: Promi
             </span>
           </div>
           <h1 className="mt-2 text-[28px] leading-tight font-semibold tracking-[-0.015em] md:text-[32px]">{card.name}</h1>
+          {(rotatesOn || metaCount > 0 || rulings.some((r) => r.type === "BAN")) && (
+            <p className="mt-2 flex flex-wrap gap-2 text-xs">
+              {rotatesOn && (
+                <span className={cn("rounded-full px-2.5 py-1", rotatesOn <= today ? "bg-loss-tint text-loss" : "bg-inset text-ink-2")} data-testid="rotation-chip">
+                  {card.set.code} {rotationLabel(today, rotatesOn)}
+                </span>
+              )}
+              {banState(rulings) === "BAN" && <span className="rounded-full bg-loss-tint px-2.5 py-1 font-medium text-loss">✕ Banned</span>}
+              {metaCount > 0 && (
+                <Link href="/meta" className="rounded-full bg-quill-tint px-2.5 py-1 text-quill hover:underline">
+                  In {metaCount} meta {metaCount === 1 ? "deck" : "decks"}
+                </Link>
+              )}
+            </p>
+          )}
           <p className="mt-1 text-ink-2">{typeLine}</p>
 
           {/* Ticker headline: price + 1-step change for the selected printing */}
@@ -224,6 +269,33 @@ export default async function CardPage({ params, searchParams }: { params: Promi
             <RulesText rich={card.rulesTextRich} plain={card.rulesText} />
             {card.flavourText && <p className="mt-4 border-t border-rule-soft pt-3 text-sm text-ink-3 italic">{card.flavourText}</p>}
           </section>
+
+          {/* ── Rulings ── */}
+          {rulings.length > 0 && (
+            <section className="mt-6 rounded-[var(--radius-panel)] border border-rule bg-sheet p-5" aria-labelledby="rulings-h" data-testid="card-rulings">
+              <h2 id="rulings-h" className="eyebrow mb-3">
+                Rulings
+              </h2>
+              {errata && (
+                <div className="mb-4">
+                  <p className="mb-2 text-sm font-medium">
+                    Errata · <span className="num">{dayKey(errata.effectiveOn)}</span>
+                  </p>
+                  <ErrataDiff oldText={errata.oldText ?? ""} newText={errata.newText!} />
+                </div>
+              )}
+              <ul className="space-y-1.5 text-sm">
+                {rulings.map((r) => (
+                  <li key={r.id} className="flex gap-3">
+                    <span className="num w-24 shrink-0 text-xs text-ink-3">{dayKey(r.effectiveOn)}</span>
+                    <Link href={`/news/${r.id}`} className="min-w-0 flex-1 hover:text-quill">
+                      <span className="font-medium">{RULING_LABEL[r.type as RulingType]}</span> — {r.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* ── Prices ── */}
           <section id="prices" className="mt-8 scroll-mt-6" aria-labelledby="prices-h">
@@ -329,6 +401,41 @@ export default async function CardPage({ params, searchParams }: { params: Promi
                 </p>
               )}
             </div>
+          </section>
+
+          {sinceRelease && sinceRelease.some((x) => x.amount) && (
+            <section className="mt-4 rounded-[var(--radius-panel)] border border-rule bg-sheet p-4" aria-labelledby="since-h">
+              <h3 id="since-h" className="eyebrow mb-3">
+                Price since release · {selected.set.name}
+              </h3>
+              <ol className="grid grid-cols-4 gap-2 text-sm">
+                {sinceRelease.map((x, i) => {
+                  const prev = sinceRelease.slice(0, i).reverse().find((p) => p.amount)?.amount;
+                  const cur = x.amount ? conv(x.amount.a, x.amount.c) : null;
+                  const prevD = prev ? conv(prev.a, prev.c) : null;
+                  return (
+                    <li key={x.label}>
+                      <p className="text-xs text-ink-3">{x.label}</p>
+                      <p className="num font-medium">{cur != null ? formatMoney(cur, display) : "—"}</p>
+                      {cur != null && prevD ? <Delta amount={null} pct={((cur - prevD) / prevD) * 100} className="text-xs" /> : null}
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          )}
+
+          <section id="watch" className="mt-4 scroll-mt-6 rounded-[var(--radius-panel)] border border-rule bg-sheet p-4" aria-labelledby="watch-h">
+            <h3 id="watch-h" className="eyebrow mb-3">
+              {watch ? "Watching this printing" : "Watch this printing"}
+            </h3>
+            <WatchForm
+              variantId={selected.id}
+              existing={watch}
+              defaultCurrency={display}
+              deck={watchDeck}
+              showPreorder={selected.set.status === "PREVIEW" || !!(release && Date.parse(release) > Date.now() - 60 * 86_400_000) || watch?.preorderPrice != null}
+            />
           </section>
 
           {/* ── Your copies ── */}
@@ -525,4 +632,10 @@ function PriceHeadline({
       <SourceStamp source="TCGPLAYER" asOf={last!.capturedAt} className="mt-1 block" />
     </div>
   );
+}
+
+function banState(rulings: { type: string; effectiveOn: Date }[]): "BAN" | "UNBAN" | null {
+  const today = dayKey(); // calendar days, not instants
+  const last = rulings.filter((r) => (r.type === "BAN" || r.type === "UNBAN") && dayKey(r.effectiveOn) <= today).sort((a, b) => b.effectiveOn.getTime() - a.effectiveOn.getTime())[0];
+  return (last?.type as "BAN" | "UNBAN") ?? null;
 }

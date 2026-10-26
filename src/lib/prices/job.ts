@@ -8,6 +8,7 @@ import { fetchUsdRates } from "@/lib/providers/fx";
 import { fetchGroup, fetchGroups, type TcgPriceRow } from "@/lib/providers/tcgcsv";
 import { sleep } from "@/lib/providers/http";
 import { encodeFinishes, reconcileFinishes } from "@/lib/catalog/finishes";
+import { evaluateWatches } from "@/lib/alerts/service";
 
 export interface PriceJobResult {
   day: string;
@@ -18,6 +19,7 @@ export interface PriceJobResult {
   unmatchedPrices: number;
   finishes: { created: number; converted: number; removed: number };
   warnings: string[];
+  watchAlerts: number;
   ms: number;
 }
 
@@ -123,7 +125,16 @@ export async function runPriceJob(db: PrismaClient, opts: { day?: string } = {})
       snapshots += Math.min(BATCH, writes.length - i);
     }
 
+    // 5. Watchlist alerts
+    let watchAlerts = 0;
+    try {
+      watchAlerts = await evaluateWatches(db);
+    } catch (e) {
+      warnings.push(`Watch alerts failed: ${(e as Error).message}`);
+    }
+
     const result: PriceJobResult = {
+      watchAlerts,
       day,
       fx,
       groups: groups.length,

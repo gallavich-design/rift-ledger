@@ -14,6 +14,7 @@ async function main() {
   const db = new PrismaClient({ datasources: { db: { url: `file:${E2E_DB}` } } });
   try {
     await db.user.deleteMany({}); // cascades to every user-owned table
+    await db.rulingEvent.deleteMany({});
     await db.priceSnapshot.deleteMany({ where: { source: { in: ["DEMO", "MANUAL"] } } });
     const n = await db.priceSnapshot.count({ where: { source: "TCGPLAYER" } });
     if (!n) throw new Error("No TCGplayer prices in dev.db — run npm run sync:prices first.");
