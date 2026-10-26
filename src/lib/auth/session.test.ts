@@ -45,3 +45,13 @@ describe("sign-in session", () => {
     expect(safeEqual("abc", "abcd")).toBe(false);
   });
 });
+
+describe("cron endpoints", () => {
+  it("need the bearer secret when set, and are closed on a production server without one", async () => {
+    const { cronAuthorized } = await import("./session");
+    expect(cronAuthorized("Bearer s3", { CRON_SECRET: "s3", NODE_ENV: "production" })).toBe(true);
+    expect(cronAuthorized("Bearer nope", { CRON_SECRET: "s3", NODE_ENV: "production" })).toBe(false);
+    expect(cronAuthorized(null, { NODE_ENV: "production" })).toBe(false);
+    expect(cronAuthorized(null, { NODE_ENV: "development" })).toBe(true);
+  });
+});

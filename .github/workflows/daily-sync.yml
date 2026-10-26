@@ -1,0 +1,15 @@
+# Daily card + price refresh for a deployed Rift Ledger.
+# Repository secrets: APP_URL (e.g. https://rift-ledger.fly.dev) and CRON_SECRET (same value as the app's).
+name: Daily sync
+on:
+  schedule:
+    - cron: "15 21 * * *" # 04:15 Bangkok — after tcgcsv refreshes (~20:00 UTC)
+  workflow_dispatch:
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cards
+        run: curl -fsS -m 300 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ secrets.APP_URL }}/api/cron/sync-cards"
+      - name: Prices
+        run: curl -fsS -m 300 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ secrets.APP_URL }}/api/cron/sync-prices"

@@ -1,5 +1,27 @@
 # Changelog
 
+## After Phase 5 — sign-in, bulk import, deploy (2026-10-26)
+
+No schema changes.
+
+### Added
+- **Sign-in gate**: one owner password (`APP_PASSWORD`), signed 30-day session cookie (HMAC, httpOnly,
+  Secure behind HTTPS), sign-in page, sign out in Settings, failed attempts slowed down. Share links,
+  cron and PWA files stay public; private APIs answer 401. A production server without a password
+  answers 503 with setup instructions (opt out with `RIFT_LEDGER_OPEN=1` on a trusted machine).
+- **Bulk import** (Collection → Import): paste a list ("3 Jinx - Rebel", "OGN-202 foil") or upload a CSV
+  (comma, semicolon or tab; template download; a Rift Ledger lots export imports as-is). Rows are
+  matched by set + number, exact name, or a flagged best guess; the preview shows each match, what's
+  ambiguous and what's not found. Missing prices use the market price (or 0, your choice). Saved as
+  orders grouped by date, seller and currency; storage locations are created by name.
+- **Deploy**: Dockerfile (SQLite on a `/data` volume), `fly.toml` (Singapore), start script that runs
+  migrations and fills the catalogue on first boot, and a GitHub Actions daily sync.
+
+### Changed
+- Cron endpoints no longer trust the Host header to allow unauthenticated calls: without `CRON_SECRET`
+  they run only in development or with `RIFT_LEDGER_OPEN=1`.
+
+
 ## Phase 5 — Extras (2026-10-26)
 
 ### Schema migrations

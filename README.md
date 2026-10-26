@@ -30,6 +30,7 @@ overrides are entered by you. Settings → **Load demo data** builds a separate 
 | `npm test` | Vitest unit tests (includes every worked example from the spec) |
 | `npm run e2e` | Playwright tests. Needs `npm run build`, synced cards and prices. Runs on a copy (`prisma/e2e.db`), never your data. |
 | `npm run typecheck` / `lint` | TypeScript / ESLint |
+| `npm run sync:cards && npm run sync:prices` | Fill a new database (the Docker image does this on first boot) |
 | `npx tsx scripts/make-icons.ts` | Re-render the PWA PNG icons from `public/icon.svg` |
 | `npx tsx scripts/verify-roundtrip.ts <export.json> <new.db>` | Import an export into a brand-new database and print its dashboard totals |
 
@@ -156,7 +157,57 @@ document them in `.env.example`.
 - `.interface-design/system.md` — design system decisions
 - `prisma/schema.prisma` — full domain model; money is always integer minor units + currency code
 
+## Deploy (get your own link)
+
+Rift Ledger is one Node server plus a SQLite file, so it needs a host that keeps a disk between
+restarts: **Fly.io** (config included), **Railway**, or any small VPS with Docker. (Vercel and other
+serverless hosts have no persistent disk — they'd need the Postgres route below.)
+
+**Required environment**
+
+| Variable | What |
+| --- | --- |
+| `APP_PASSWORD` | The password you'll sign in with. Without it a production server refuses to serve pages. |
+| `AUTH_SECRET` | Long random string that signs sessions (`openssl rand -base64 32`). |
+| `CRON_SECRET` | Long random string the daily sync must send as `Authorization: Bearer …`. |
+| `DATABASE_URL` | Set by the Docker image to `file:/data/rift-ledger.db` — keep `/data` on a volume. |
+
+**Fly.io** (Singapore region, closest to Bangkok — needs a Fly account with billing; check their pricing):
+
+```sh
+fly launch --no-deploy --copy-config        # pick an app name; edit `app` in fly.toml if asked
+fly volumes create rift_data --region sin --size 1
+fly secrets set APP_PASSWORD='…' AUTH_SECRET="$(openssl rand -base64 32)" CRON_SECRET="$(openssl rand -base64 32)"
+fly deploy
+```
+
+Your link is `https://<app-name>.fly.dev`. On first boot the server syncs the card catalogue and
+today's prices in the background (about a minute); sign in meanwhile.
+
+**Any Docker host**
+
+```sh
+docker build -t rift-ledger .
+docker run -d --name rift-ledger -p 3000:3000 -v rift-data:/data \
+  -e APP_PASSWORD='…' -e AUTH_SECRET='…' -e CRON_SECRET='…' rift-ledger
+```
+
+Put it behind HTTPS (Caddy, Cloudflare Tunnel, or the host's proxy) — the session cookie is marked
+Secure when the proxy sends `X-Forwarded-Proto: https`.
+
+**Daily refresh**: `.github/workflows/daily-sync.yml` calls the two cron endpoints at 04:15 Bangkok.
+Push the repo to GitHub and add repository secrets `APP_URL` and `CRON_SECRET`. Any other scheduler
+that can send the Bearer header works too.
+
+**Moving your data in**: Settings → Your data → Export all (JSON) on your local copy, then Import on
+the deployed one (it must be empty).
+
+**Sign-in model (v1)**: one owner password. Sessions last 30 days; changing `APP_PASSWORD` (or
+`AUTH_SECRET`) signs every device out. Share links (`/share/…`) stay public. `npm run dev` never asks
+for a password; a production server without one only runs with `RIFT_LEDGER_OPEN=1` (trusted machine only).
+
 ## Deploying on Postgres
 
-Change `provider = "sqlite"` to `"postgresql"` in `prisma/schema.prisma`, point `DATABASE_URL` at
-Postgres, and run `npx prisma migrate deploy`. The schema avoids SQLite-only features.
+The checked-in migrations are SQLite SQL. For Postgres, change `provider` in `prisma/schema.prisma`,
+create a fresh baseline (`prisma migrate diff --from-empty --to-schema-datamodel … --script`) into a
+new migrations folder, and `prisma migrate deploy`. Then move data with Export → Import.

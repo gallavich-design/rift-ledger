@@ -1,8 +1,9 @@
 # Next
 
 ## Deferred from Phase 1
-- **Auth.js (NextAuth)** — every user-owned table already has `userId`; v1 runs as one local owner
-  (`src/lib/currentUser.ts`). Wire magic-link or Google sign-in before deploying publicly.
+- **Multi-user accounts (Auth.js)** — v1 is protected by one owner password (`APP_PASSWORD`). Every
+  user-owned table already has `userId`; real accounts (Google / magic link) are needed only if more
+  than one person keeps a collection in the same install. Demo data would then need one demo user each.
 - **shadcn/ui CLI** — components are written in shadcn style (cva + Radix Slot) by hand rather than
   pulled from the registry. Add real shadcn primitives (Dialog, Popover, Command) as phases need them.
 - Catalogue sync runs ~60 s (network-bound across 15 pages). Fine daily; could fetch pages in parallel.
@@ -12,7 +13,6 @@
   = Riftbound, keyed by Cardmarket expansion ids that Riftcodex already maps), but products carry no
   collector number, so matching is by set + name and is ambiguous for alt arts. Plan: match only
   unambiguous products, list the rest for manual linking.
-- **CSV / paste-a-list bulk import** and a downloadable template (spec §4.3).
 - Historical FX: values convert at the latest rate. A purchase's THB cost at the time it was paid
   could be stored per order if wanted.
 - Today's change and movers use near-mint prices (condition multipliers apply to totals, not to deltas).
@@ -42,6 +42,12 @@
   report renders without them.
 - PWA has no offline data; it shows an offline page. Push notifications for alerts are not built.
 - Trade lists are one per user; shared links show market prices, never your costs or holdings.
+
+## After Phase 5
+- Bulk import rows can't be edited in the preview; fix the text and preview again. Graded copies
+  aren't matched by import (add them on the card page).
+- The Docker image includes dev dependencies (for `tsx` first-run and sync scripts); a slimmer
+  standalone image is possible.
 
 ## Verify before relying on them (`TODO verify`)
 - `src/config/gameRules.ts` — sourced from Core Rules §103 on 2026-10-26; only the sideboard size (0 or 8) is still `TODO verify`.

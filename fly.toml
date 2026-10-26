@@ -1,0 +1,24 @@
+# Fly.io config. Replace the app name, then see README → Deploy.
+app = "rift-ledger-CHANGE-ME"
+primary_region = "sin" # Singapore — closest to Bangkok
+
+[build]
+
+[env]
+  PORT = "3000"
+  DATABASE_URL = "file:/data/rift-ledger.db"
+
+[[mounts]]
+  source = "rift_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

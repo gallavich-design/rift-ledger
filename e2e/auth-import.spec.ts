@@ -119,5 +119,6 @@ test("Sign-in gate: password required, share links stay public, no password → 
   } finally {
     locked.kill();
     open.kill();
+    await db.settings.update({ where: { userId: owner.id }, data: { tradeShareToken: null } }); // leave sharing off for later specs
   }
 });

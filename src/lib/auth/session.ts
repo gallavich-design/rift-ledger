@@ -75,3 +75,13 @@ export function openWithoutPassword(env: Record<string, string | undefined> = pr
 export function safeNext(next: string | null | undefined): string {
   return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login") ? next : "/dashboard";
 }
+
+/**
+ * Cron endpoints: with CRON_SECRET, require `Authorization: Bearer <secret>`. Without it, they only
+ * run where the whole app is open (development, or RIFT_LEDGER_OPEN=1) — never on a public server.
+ */
+export function cronAuthorized(authorization: string | null, env: Record<string, string | undefined> = process.env): boolean {
+  const secret = env.CRON_SECRET?.trim();
+  if (secret) return safeEqual(authorization ?? "", `Bearer ${secret}`);
+  return openWithoutPassword(env);
+}
