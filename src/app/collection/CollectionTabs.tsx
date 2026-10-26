@@ -3,6 +3,7 @@ import { cn } from "@/lib/ui";
 
 const TABS = [
   { key: "positions", label: "Cards", href: "/collection" },
+  { key: "binder", label: "Set binder", href: "/collection/binder" },
   { key: "orders", label: "Orders & sales", href: "/collection/orders" },
 ] as const;
 
