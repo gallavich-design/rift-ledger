@@ -1,0 +1,52 @@
+# Deploys Rift Ledger to Fly.io on every push to main (and on demand).
+# One-time setup in GitHub → Settings → Secrets and variables → Actions:
+#   Secrets:   FLY_API_TOKEN (fly tokens create org), APP_PASSWORD, AUTH_SECRET, CRON_SECRET
+#   Variables: FLY_APP (globally unique app name, e.g. rift-ledger-sun)
+# The first run creates the app and its 1 GB volume in Singapore; later runs just deploy.
+# Without FLY_API_TOKEN the job is skipped, so pushes never fail on a fork or before setup.
+name: Deploy to Fly.io
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency: deploy-fly
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      APP: ${{ vars.FLY_APP }}
+    steps:
+      - name: Check setup
+        id: check
+        run: |
+          if [ -z "$FLY_API_TOKEN" ] || [ -z "$APP" ]; then
+            echo "FLY_API_TOKEN secret or FLY_APP variable not set — skipping deploy."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.go == 'true'
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.check.outputs.go == 'true'
+      - name: Create app and volume (first run only)
+        if: steps.check.outputs.go == 'true'
+        run: |
+          flyctl status --app "$APP" >/dev/null 2>&1 || flyctl apps create "$APP"
+          flyctl volumes list --app "$APP" --json | grep -q '"rift_data"' || flyctl volumes create rift_data --app "$APP" --region sin --size 1 --yes
+      - name: Set secrets
+        if: steps.check.outputs.go == 'true'
+        env:
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$APP_PASSWORD" || { echo "Add the APP_PASSWORD secret first."; exit 1; }
+          flyctl secrets set --app "$APP" --stage APP_PASSWORD="$APP_PASSWORD" AUTH_SECRET="$AUTH_SECRET" CRON_SECRET="$CRON_SECRET"
+      - name: Deploy
+        if: steps.check.outputs.go == 'true'
+        run: flyctl deploy --app "$APP" --remote-only --ha=false
+      - name: Link
+        if: steps.check.outputs.go == 'true'
+        run: echo "Live at https://$APP.fly.dev" >> "$GITHUB_STEP_SUMMARY"

@@ -184,6 +184,12 @@ fly deploy
 Your link is `https://<app-name>.fly.dev`. On first boot the server syncs the card catalogue and
 today's prices in the background (about a minute); sign in meanwhile.
 
+**Fly.io from GitHub (no command line)**: `.github/workflows/deploy-fly.yml` deploys on every push to
+`main`. In the repo's Settings → Secrets and variables → Actions add secrets `FLY_API_TOKEN` (from
+fly.io → Tokens), `APP_PASSWORD`, `AUTH_SECRET`, `CRON_SECRET`, and a variable `FLY_APP` (a unique
+name). Then run the workflow (Actions → Deploy to Fly.io → Run workflow). The first run creates the
+app and volume; the summary shows the link. Until the token is added, the job is skipped.
+
 **Any Docker host**
 
 ```sh

@@ -1,15 +1,21 @@
 # Daily card + price refresh for a deployed Rift Ledger.
-# Repository secrets: APP_URL (e.g. https://rift-ledger.fly.dev) and CRON_SECRET (same value as the app's).
+# Uses the CRON_SECRET secret, and APP_URL (secret) or, if unset, https://<FLY_APP variable>.fly.dev.
+# Skipped until CRON_SECRET is set.
 name: Daily sync
 on:
   schedule:
-    - cron: "15 21 * * *" # 04:15 Bangkok — after tcgcsv refreshes (~20:00 UTC)
+    - cron: "15 21 * * *" # 04:15 Bangkok, after tcgcsv refreshes (~20:00 UTC)
   workflow_dispatch:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      URL: ${{ secrets.APP_URL || format('https://{0}.fly.dev', vars.FLY_APP) }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
-      - name: Cards
-        run: curl -fsS -m 300 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ secrets.APP_URL }}/api/cron/sync-cards"
-      - name: Prices
-        run: curl -fsS -m 300 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ secrets.APP_URL }}/api/cron/sync-prices"
+      - name: Cards and prices
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET not set — skipping."; exit 0; fi
+          curl -fsS -m 300 -H "Authorization: Bearer $CRON_SECRET" "$URL/api/cron/sync-cards"
+          echo
+          curl -fsS -m 300 -H "Authorization: Bearer $CRON_SECRET" "$URL/api/cron/sync-prices"
