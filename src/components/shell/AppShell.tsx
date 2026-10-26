@@ -19,6 +19,9 @@ export function AppShell({ children, demo = false, unread = 0 }: { children: Rea
   const secondary = ready.filter((n) => !PRIMARY.includes(n.href));
   const [moreOpen, setMoreOpen] = useState(false);
 
+  // Sign-in and public share pages stand alone: no navigation into the private app.
+  if (pathname === "/login" || pathname.startsWith("/share/")) return <main className="min-h-dvh">{children}</main>;
+
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)]">
       {/* Desktop rail — same canvas as content, separated by a rule */}
@@ -173,7 +176,7 @@ export function AppShell({ children, demo = false, unread = 0 }: { children: Rea
   );
 }
 
-function LedgerMark() {
+export function LedgerMark() {
   // Two offset card outlines — a ledger of cards.
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>

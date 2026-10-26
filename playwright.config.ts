@@ -17,6 +17,6 @@ export default defineConfig({
     url: `http://localhost:${PORT}/cards`,
     reuseExistingServer: false,
     timeout: 120_000,
-    env: { DATABASE_URL: E2E_DB_URL },
+    env: { DATABASE_URL: E2E_DB_URL, RIFT_LEDGER_OPEN: "1", APP_PASSWORD: "" },
   },
 });

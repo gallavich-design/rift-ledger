@@ -218,9 +218,14 @@ function Shell({ children }: { children: React.ReactNode }) {
       <PageHeader
         title="Collection"
         actions={
-          <Button asChild>
-            <Link href="/collection/add">Add purchase</Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="secondary">
+              <Link href="/collection/import">Import</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/collection/add">Add purchase</Link>
+            </Button>
+          </div>
         }
       />
       <CollectionTabs active="binder" />

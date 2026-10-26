@@ -10,6 +10,9 @@ import { LocationForm } from "./LocationForm";
 import { LocationRow } from "./LocationRow";
 import { SyncButton } from "./SyncButton";
 import { DataSection } from "./DataSection";
+import { authConfig } from "@/lib/auth/session";
+import { signOut } from "@/app/login/actions";
+import { Button } from "@/components/ui/Button";
 import { userHasData } from "@/lib/data/exportImport";
 
 export const metadata = { title: "Settings" };
@@ -133,6 +136,16 @@ export default async function SettingsPage() {
           </ul>
         )}
       </Section>
+
+      {authConfig().password && (
+        <Section id="account" title="Sign-in" description="This install is protected by the app password (APP_PASSWORD). Sessions last 30 days; changing the password signs every device out.">
+          <form action={signOut} className="rounded-[var(--radius-panel)] border border-rule bg-sheet p-4">
+            <Button type="submit" variant="secondary">
+              Sign out on this device
+            </Button>
+          </form>
+        </Section>
+      )}
 
       <Section id="data" title="Your data" description="Download a full backup, or move your collection to another install. Exports never include demo data.">
         <DataSection demo={demo} hasData={hasData} />
