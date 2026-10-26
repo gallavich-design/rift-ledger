@@ -48,3 +48,8 @@ prisma/*.db-journal
 /test-results
 /playwright-report
 prisma/e2e.db*
+
+# any SQLite file, anywhere (e.g. Prisma shadow databases)
+*.db
+*.db-journal
+scripts/tmp

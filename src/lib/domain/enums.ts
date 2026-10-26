@@ -56,3 +56,21 @@ export const SOURCE_SHORT: Record<string, string> = {
 export function isCurrencyCode(c: string): c is Currency {
   return (CURRENCIES as readonly string[]).includes(c);
 }
+
+export const SEALED_KINDS = ["BOOSTER_BOX", "PACK", "CARTON", "BUNDLE", "OTHER"] as const;
+export type SealedKind = (typeof SEALED_KINDS)[number];
+export const SEALED_KIND_LABEL: Record<SealedKind, string> = {
+  BOOSTER_BOX: "Booster box",
+  PACK: "Pack",
+  CARTON: "Case",
+  BUNDLE: "Bundle / box set",
+  OTHER: "Other",
+};
+/** Best guess of the kind from a TCGplayer product name; the user can change it. */
+export function guessSealedKind(name: string): SealedKind {
+  if (/case/i.test(name)) return "CARTON";
+  if (/display|booster box/i.test(name)) return "BOOSTER_BOX";
+  if (/pack/i.test(name)) return "PACK";
+  if (/bundle|box set|deck/i.test(name)) return "BUNDLE";
+  return "OTHER";
+}

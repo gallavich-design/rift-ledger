@@ -38,6 +38,7 @@ model User {
   metaDecks         MetaDeck[]
   alerts            Alert[]
   watches           WatchItem[]
+  tradeItems        TradeListItem[]
 }
 
 model Settings {
@@ -48,6 +49,7 @@ model Settings {
   defaultValuationSource String @default("TCGPLAYER") // TCGPLAYER | LOCAL | CARDMARKET | MANUAL
   fxOverrides            String @default("{}") // JSON: {"USD_THB": 3300} as rate × 100
   conditionMultipliers   String @default("{\"NM\":100,\"LP\":85,\"MP\":70,\"HP\":50,\"DMG\":30}") // percent
+  tradeShareToken        String? @unique // private link to your haves/wants lists
 }
 
 // ───────────────────────────── Catalog ─────────────────────────────
@@ -135,6 +137,7 @@ model CardVariant {
   lots              Lot[]
   deckCards         DeckCard[]
   watches           WatchItem[]
+  tradeItems        TradeListItem[]
 
   @@index([cardId])
   @@index([tcgplayerId])
@@ -229,7 +232,8 @@ model StorageLocation {
   notes     String?
   createdAt DateTime @default(now())
 
-  lots Lot[]
+  lots   Lot[]
+  sealed SealedProduct[]
 
   @@unique([userId, name])
 }
@@ -320,9 +324,44 @@ model SealedProduct {
   currency    String
   acquiredOn  DateTime
   notes       String?
+  manualPrice    Int? // override when TCGplayer has no price for this product
+  manualCurrency String?
+  imageUrl       String?
+  storageLocationId String?
+  storageLocation   StorageLocation? @relation(fields: [storageLocationId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
 
   openings PackOpening[]
+}
+
+// Daily TCGplayer prices for sealed products (keyed by TCGplayer product id), like PriceSnapshot for cards.
+model SealedPriceSnapshot {
+  id          String   @id @default(cuid())
+  tcgplayerId String
+  source      String
+  day         String
+  market      Int?
+  low         Int?
+  mid         Int?
+  currency    String
+  capturedAt  DateTime @default(now())
+
+  @@unique([tcgplayerId, source, day])
+}
+
+// Cards you'll trade away (HAVE) or are looking for (WANT). Shareable via Settings.tradeShareToken.
+model TradeListItem {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String // HAVE | WANT
+  variantId String
+  variant   CardVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity  Int         @default(1)
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@unique([userId, kind, variantId])
 }
 
 model PackOpening {

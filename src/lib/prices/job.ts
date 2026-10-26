@@ -16,6 +16,7 @@ export interface PriceJobResult {
   groups: number;
   products: number;
   snapshots: number;
+  sealedSnapshots: number;
   unmatchedPrices: number;
   finishes: { created: number; converted: number; removed: number };
   warnings: string[];
@@ -125,6 +126,27 @@ export async function runPriceJob(db: PrismaClient, opts: { day?: string } = {})
       snapshots += Math.min(BATCH, writes.length - i);
     }
 
+    // 4b. Sealed products (booster boxes, packs…): TcgProduct rows with no collector number/rarity.
+    const sealedIds = new Set((await db.tcgProduct.findMany({ where: { isSingle: false }, select: { productId: true } })).map((p) => p.productId));
+    const sealedWrites = allPrices.filter((p) => sealedIds.has(p.productId) && !byKey.has(`${p.productId}|${p.finish}`) && (p.market != null || p.low != null || p.mid != null));
+    // One price per sealed product: prefer the NORMAL row.
+    const sealedByProduct = new Map<string, TcgPriceRow>();
+    for (const p of sealedWrites) if (!sealedByProduct.has(p.productId) || p.finish === "NORMAL") sealedByProduct.set(p.productId, p);
+    const sealedRows = [...sealedByProduct.values()];
+    for (let i = 0; i < sealedRows.length; i += BATCH) {
+      await db.$transaction(
+        sealedRows.slice(i, i + BATCH).map((p) => {
+          const data = { market: p.market, low: p.low, mid: p.mid, currency: p.currency, capturedAt: new Date() };
+          return db.sealedPriceSnapshot.upsert({
+            where: { tcgplayerId_source_day: { tcgplayerId: p.productId, source: "TCGPLAYER", day } },
+            update: data,
+            create: { tcgplayerId: p.productId, source: "TCGPLAYER", day, ...data },
+          });
+        }),
+      );
+    }
+    unmatched -= sealedWrites.length;
+
     // 5. Watchlist alerts
     let watchAlerts = 0;
     try {
@@ -140,6 +162,7 @@ export async function runPriceJob(db: PrismaClient, opts: { day?: string } = {})
       groups: groups.length,
       products: productCount,
       snapshots,
+      sealedSnapshots: sealedRows.length,
       unmatchedPrices: unmatched,
       finishes,
       warnings,

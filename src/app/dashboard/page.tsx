@@ -2,18 +2,9 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { getCurrentUserId, isDemoMode } from "@/lib/currentUser";
 import { addDays, dayKey } from "@/config/app";
-import {
-  availableSources,
-  getFx,
-  getPriceBook,
-  getPriceSeries,
-  getSettings,
-  loadLotsAndSales,
-  loadVariantInfo,
-  missingRates,
-  seriesDays,
-} from "@/lib/portfolio/data";
-import { breakdown, computeHistory, computeMovers, computePositions, computeTotals, type Mover } from "@/lib/portfolio/compute";
+import { availableSources, getSettings, loadVariantInfo } from "@/lib/portfolio/data";
+import { breakdown, computeMovers, type Mover } from "@/lib/portfolio/compute";
+import { buildPortfolio } from "@/lib/portfolio/full";
 import { ART_LABEL, SOURCE_LABEL, SOURCE_SHORT, type VariantArt } from "@/lib/domain/enums";
 import { formatMoney } from "@/lib/money/money";
 import { COST_COLOR, VALUE_COLOR } from "@/config/chartColors";
@@ -44,9 +35,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const display = settings.displayCurrency;
   const today = dayKey();
 
-  const [fx, { lots, lotInputs, saleInputs }] = await Promise.all([getFx(db, settings.fxOverrides), loadLotsAndSales(db, userId)]);
-
-  if (lots.length === 0) {
+  const pf = await buildPortfolio(db, userId, { source, display });
+  if (pf.ok && pf.lots.length === 0 && pf.sealedRows.length === 0) {
     return (
       <Shell sources={sources} source={source} display={display}>
         <EmptyState
@@ -64,27 +54,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </Shell>
     );
   }
-
-  const variantIds = [...new Set(lots.map((l) => l.variantId))];
-  const [prices, series, info] = await Promise.all([
-    getPriceBook(db, userId, variantIds, source),
-    getPriceSeries(db, userId, variantIds, source),
-    loadVariantInfo(db, variantIds),
-  ]);
-  const quoteCurrencies = [...prices.values()].map((p) => p.currency);
-  const missing = missingRates(fx.table, [display, ...lots.map((l) => l.currency), ...quoteCurrencies, ...saleInputs.map((s) => s.currency)]);
-  if (missing.length) {
+  if (!pf.ok) {
     return (
       <Shell sources={sources} source={source} display={display}>
         <FxMissing />
       </Shell>
     );
   }
-
-  const positions = computePositions(lotInputs, prices, fx.table, display, settings.conditionMultipliers);
-  const totals = computeTotals(positions, saleInputs, fx.table, display);
-  const days = seriesDays(series);
-  const history = computeHistory(days, lotInputs, saleInputs, series, fx.table, display, settings.conditionMultipliers);
+  const { fx, prices, series, info, positions, totals, days, history, sealed } = pf;
 
   // Today's change: latest price day vs the price day before it, for cards held now.
   const lastDay = days[days.length - 1];
@@ -102,10 +79,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const losers = movers.filter((m) => m.to < m.from).sort((a, b) => rank(a) - rank(b)).slice(0, 5);
 
   const biggest = [...positions].filter((p) => p.value != null).sort((a, b) => b.value! - a.value!).slice(0, 6);
-  const latestStamp = [...prices.values()].sort((a, b) => b.asOf.getTime() - a.asOf.getTime())[0];
+  const latestStamp = [...prices.values(), ...sealed.flatMap((x) => (x.quote ? [x.quote] : []))].sort((a, b) => b.asOf.getTime() - a.asOf.getTime())[0];
 
   const get = (id: string) => info.get(id)!;
   const breakdowns = [
+    {
+      title: "Cards vs sealed",
+      rows: [
+        { key: "Cards", value: totals.cardsValue, count: positions.reduce((a, p) => a + p.quantity, 0) },
+        { key: "Sealed", value: totals.sealedValue, count: sealed.reduce((a, x) => a + x.remaining, 0) },
+      ].filter((r) => r.count > 0),
+    },
     { title: "By set", rows: breakdown(positions, (p) => get(p.variantId).setName) },
     { title: "By rarity", rows: breakdown(positions, (p) => get(p.variantId).rarity) },
     { title: "By domain", rows: breakdown(positions, (p) => (get(p.variantId).domains.length ? get(p.variantId).domains : ["Colorless"])) },
@@ -276,10 +260,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           {breakdowns
             .filter((b) => b.rows.length > 1 || b.title === "By set")
             .map((b) => (
-              <BreakdownBars key={b.title} title={b.title} rows={b.rows} currency={display} total={totals.value} />
+              <BreakdownBars key={b.title} title={b.title} rows={b.rows} currency={display} total={b.title === "Cards vs sealed" ? totals.value : totals.cardsValue} />
             ))}
         </div>
-        <p className="mt-2 text-xs text-ink-3">Breakdowns with a single bucket (e.g. everything raw, all English) are hidden. Sealed products join in Phase 5.</p>
+        <p className="mt-2 text-xs text-ink-3">Breakdowns with a single bucket (e.g. everything raw, all English) are hidden.</p>
       </section>
 
       <p className="mt-8 text-xs text-ink-3">

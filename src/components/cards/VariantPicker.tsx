@@ -55,12 +55,15 @@ export function VariantPicker({
   label = "Card",
   error,
   autoFocus,
+  resetOnPick,
 }: {
   value: PickedVariant | null;
   onChange: (v: PickedVariant | null) => void;
   label?: string;
   error?: string;
   autoFocus?: boolean;
+  /** Stay in search mode after a pick (for adding many cards in a row, e.g. pack pulls). */
+  resetOnPick?: boolean;
 }) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<CardHit[]>([]);
@@ -93,6 +96,16 @@ export function VariantPicker({
     };
   }, [q, card]);
 
+  function pick(v: PickedVariant) {
+    onChange(v);
+    setCard(null);
+    if (resetOnPick) {
+      setQ("");
+      setVariants([]);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }
+
   async function chooseCard(c: CardHit) {
     setCard(c);
     setHits([]);
@@ -100,10 +113,8 @@ export function VariantPicker({
     const vs: PickedVariant[] = r.variants ?? [];
     setVariants(vs);
     setActiveVar(0);
-    if (vs.length === 1) {
-      onChange(vs[0]);
-      setCard(null);
-    } else requestAnimationFrame(() => listRef.current?.focus());
+    if (vs.length === 1) pick(vs[0]);
+    else requestAnimationFrame(() => listRef.current?.focus());
   }
 
   function reset() {
@@ -153,10 +164,7 @@ export function VariantPicker({
               setActiveVar((a) => Math.max(a - 1, 0));
             } else if (e.key === "Enter") {
               e.preventDefault();
-              if (variants[activeVar]) {
-                onChange(variants[activeVar]);
-                setCard(null);
-              }
+              if (variants[activeVar]) pick(variants[activeVar]);
             } else if (e.key === "Escape") reset();
           }}
           className="max-h-72 overflow-y-auto rounded-[var(--radius-control)] border border-rule bg-sheet focus:border-quill focus:outline-none"
@@ -169,10 +177,7 @@ export function VariantPicker({
               role="option"
               aria-selected={i === activeVar}
               onMouseEnter={() => setActiveVar(i)}
-              onClick={() => {
-                onChange(v);
-                setCard(null);
-              }}
+              onClick={() => pick(v)}
               className={cn("flex cursor-pointer items-center gap-3 px-2 py-1.5", i === activeVar && "bg-hover")}
             >
               <Thumb url={v.imageUrl} domains={v.domains} />
