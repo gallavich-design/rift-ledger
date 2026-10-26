@@ -1,5 +1,9 @@
 import { db } from "@/lib/db";
-import { getCurrentUserId } from "@/lib/currentUser";
+import { DEMO_EMAIL, getCurrentUserId, isDemoMode } from "@/lib/currentUser";
+import { availableSources, getFx, getSettings } from "@/lib/portfolio/data";
+import { MoneyForm } from "./MoneyForm";
+import { ActionButton } from "./ActionButton";
+import { deleteDemoData, enterDemo, exitDemo, loadDemoData, runPriceSync } from "./actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { STORAGE_TYPE_LABEL, type StorageType } from "@/lib/domain/enums";
 import { LocationForm } from "./LocationForm";
@@ -15,17 +19,54 @@ function fmt(d: Date) {
 
 export default async function SettingsPage() {
   const userId = await getCurrentUserId();
-  const [locations, lastSync, counts, sets] = await Promise.all([
+  const demo = await isDemoMode();
+  const settings = await getSettings(db, userId);
+  const [locations, lastSync, counts, sets, fx, sources, lastPrices, demoUser] = await Promise.all([
     db.storageLocation.findMany({ where: { userId }, orderBy: { name: "asc" }, include: { _count: { select: { lots: true } } } }),
     db.syncRun.findFirst({ where: { kind: "CARDS", ok: true }, orderBy: { startedAt: "desc" } }),
     Promise.all([db.card.count(), db.cardVariant.count()]),
     db.set.findMany({ orderBy: [{ releaseDate: "asc" }] }),
+    getFx(db, {}),
+    availableSources(db, userId, demo),
+    db.syncRun.findFirst({ where: { kind: "PRICES", ok: true }, orderBy: { startedAt: "desc" } }),
+    db.user.findUnique({ where: { email: DEMO_EMAIL }, select: { id: true } }),
   ]);
+  const priceDetail = lastPrices?.detail ? (JSON.parse(lastPrices.detail) as { day: string; snapshots: number; unmatchedPrices: number }) : null;
+  const valuationSources = [...new Set([...sources, "LOCAL"])].filter((s) => s !== "CARDMARKET" || sources.includes(s));
   const [cardCount, variantCount] = counts;
 
   return (
     <div className="mx-auto max-w-[880px] px-4 py-6 md:px-8 md:py-8">
       <PageHeader title="Settings" />
+
+      <Section id="money" title="Money" description="How values are shown. Prices and purchases are always stored in the currency they happened in; conversion is for display only.">
+        <MoneyForm initial={settings} sources={valuationSources} dailyRates={fx.rates} />
+      </Section>
+
+      <Section
+        id="prices"
+        title="Price data"
+        description="TCGplayer prices come from tcgcsv.com's daily dump (refreshed around 03:00 Bangkok time). Run the job once a day via cron (see README), or update now."
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-panel)] border border-rule bg-sheet p-4">
+          <p className="text-sm text-ink-2">
+            {lastPrices ? (
+              <>
+                Last updated <span className="num">{fmt(lastPrices.finishedAt ?? lastPrices.startedAt)}</span>
+                {priceDetail && (
+                  <span className="text-ink-3">
+                    {" "}
+                    · <span className="num">{priceDetail.snapshots.toLocaleString("en-US")}</span> printings priced for <span className="num">{priceDetail.day}</span>
+                  </span>
+                )}
+              </>
+            ) : (
+              "Prices haven't been fetched yet."
+            )}
+          </p>
+          <ActionButton action={runPriceSync} label="Update prices now" pendingLabel="Updating…" pendingHint="Fetching TCGplayer prices and exchange rates…" icon="refresh" />
+        </div>
+      </Section>
 
       <Section
         id="locations"
@@ -88,6 +129,28 @@ export default async function SettingsPage() {
             ))}
           </ul>
         )}
+      </Section>
+
+      <Section
+        id="demo"
+        title="Demo data"
+        description="A separate demo account with a few months of made-up purchases, sales and price history on real cards. It never mixes with your own data — your collection is untouched while you look around."
+      >
+        <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-panel)] border border-rule bg-sheet p-4">
+          {demo ? (
+            <>
+              <p className="flex-1 text-sm text-ink-2">You&apos;re viewing demo data.</p>
+              <ActionButton action={exitDemo} label="Back to my data" pendingLabel="Switching…" variant="primary" />
+              <ActionButton action={deleteDemoData} label="Delete demo data" pendingLabel="Deleting…" variant="ghost" confirm="Delete the demo account?" />
+            </>
+          ) : (
+            <>
+              <p className="flex-1 text-sm text-ink-2">{demoUser ? "Demo data is loaded." : "Needs TCGplayer prices — update prices first if you haven't."}</p>
+              {demoUser && <ActionButton action={enterDemo} label="View demo" pendingLabel="Switching…" />}
+              <ActionButton action={loadDemoData} label={demoUser ? "Rebuild demo data" : "Load demo data"} pendingLabel="Building…" pendingHint="Creating demo purchases and price history…" variant={demoUser ? "ghost" : "primary"} />
+            </>
+          )}
+        </div>
       </Section>
     </div>
   );

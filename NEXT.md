@@ -5,9 +5,19 @@
   (`src/lib/currentUser.ts`). Wire magic-link or Google sign-in before deploying publicly.
 - **shadcn/ui CLI** — components are written in shadcn style (cva + Radix Slot) by hand rather than
   pulled from the registry. Add real shadcn primitives (Dialog, Popover, Command) as phases need them.
-- **"Load demo data"** button — lands with Phase 2, when there's portfolio data to demo. Demo rows
-  will live under a separate `isDemo` user so they never mix with real data.
 - Catalogue sync runs ~60 s (network-bound across 15 pages). Fine daily; could fetch pages in parallel.
+
+## Deferred from Phase 2
+- **Cardmarket prices** — a legitimate public route exists (Cardmarket's price-guide download, game 22
+  = Riftbound, keyed by Cardmarket expansion ids that Riftcodex already maps), but products carry no
+  collector number, so matching is by set + name and is ambiguous for alt arts. Plan: match only
+  unambiguous products, list the rest for manual linking.
+- **CSV / paste-a-list bulk import** and a downloadable template (spec §4.3).
+- **"Cards vs sealed" breakdown** — needs sealed products (Phase 5).
+- Historical FX: values convert at the latest rate. A purchase's THB cost at the time it was paid
+  could be stored per order if wanted.
+- Today's change and movers use near-mint prices (condition multipliers apply to totals, not to deltas).
+- Three TCGplayer groups (Legacy, Radiance, Secret Garden) aren't in Riftcodex yet, so they can't be priced.
 
 ## Verify before relying on them (`TODO verify`)
 - `src/config/gameRules.ts` — deck size, copy limit, rune deck, battlefields, sideboard, signature rules.

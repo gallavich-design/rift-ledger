@@ -112,7 +112,8 @@ model CardVariant {
   card            Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
   setId           String
   set             Set     @relation(fields: [setId], references: [id])
-  sourceId        String? @unique // Riftcodex printing id (riftbound_id is NOT unique upstream)
+  sourceId        String? // Riftcodex printing id (riftbound_id is NOT unique upstream); shared by NORMAL/FOIL of one printing
+  variantKey      String  @unique // "sourceId|finish|language|gradingCompany|grade" — see src/lib/catalog/variantKey.ts
   riftboundId     String?
   tcgplayerId     String?
   collectorNumber Int?
@@ -137,6 +138,25 @@ model CardVariant {
 
   @@index([cardId])
   @@index([tcgplayerId])
+  @@index([sourceId])
+}
+
+// TCGplayer product catalogue from tcgcsv.com (category 89 = Riftbound). Drives which finishes exist.
+model TcgProduct {
+  productId   String   @id
+  groupId     String
+  groupName   String?
+  name        String
+  finishes    String   @default("") // "|NORMAL|FOIL|" — finishes TCGplayer has prices for
+  isSingle    Boolean  @default(true)
+  number      String?
+  rarity      String?
+  imageUrl    String?
+  url         String?
+  releasedOn  DateTime?
+  updatedAt   DateTime @updatedAt
+
+  @@index([groupId])
 }
 
 // ───────────────────────────── Prices ─────────────────────────────
@@ -244,7 +264,8 @@ model Lot {
   quantity          Int
   remainingQuantity Int
   unitPrice         Int
-  landedUnitCost    Int // unit price + allocated share of order extras (minor units)
+  landedUnitCost    Int // landedTotal / quantity, rounded down — display only
+  landedTotal       Int // exact landed cost of the whole lot: line price + allocated share of order extras
   currency          String
   condition         String           @default("NM") // NM | LP | MP | HP | DMG
   acquiredOn        DateTime

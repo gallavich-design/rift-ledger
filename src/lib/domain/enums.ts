@@ -36,3 +36,23 @@ export type PriceSource = (typeof PRICE_SOURCES)[number];
 
 export const CURRENCIES = ["THB", "USD", "EUR"] as const;
 export type Currency = (typeof CURRENCIES)[number];
+
+export const SOURCE_LABEL: Record<string, string> = {
+  TCGPLAYER: "TCGplayer market",
+  LOCAL: "Local (Thailand)",
+  CARDMARKET: "Cardmarket trend",
+  MANUAL: "Manual",
+  DEMO: "Demo prices",
+};
+
+export const SOURCE_SHORT: Record<string, string> = {
+  TCGPLAYER: "TCGplayer",
+  LOCAL: "Local",
+  CARDMARKET: "Cardmarket",
+  MANUAL: "Manual",
+  DEMO: "Demo",
+};
+
+export function isCurrencyCode(c: string): c is Currency {
+  return (CURRENCIES as readonly string[]).includes(c);
+}

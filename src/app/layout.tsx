@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Thai } from "next/font/google";
 import { AppShell } from "@/components/shell/AppShell";
+import { isDemoMode } from "@/lib/currentUser";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({ variable: "--font-plex-sans", subsets: ["latin"], weight: ["400", "500", "600"] });
@@ -18,11 +19,11 @@ export const viewport: Viewport = {
   colorScheme: "light",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${plexSans.variable} ${plexThai.variable} ${plexMono.variable}`}>
       <body>
-        <AppShell>{children}</AppShell>
+        <AppShell demo={await isDemoMode()}>{children}</AppShell>
       </body>
     </html>
   );

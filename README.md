@@ -12,10 +12,13 @@ npm install                 # also runs `prisma generate`
 cp .env.example .env        # DATABASE_URL="file:./dev.db" is enough for local dev
 npx prisma migrate deploy   # creates prisma/dev.db (use `npm run db:migrate` while developing the schema)
 npm run sync:cards          # downloads every released set from Riftcodex (~1 minute)
+npm run sync:prices         # TCGplayer prices + FX rates for today (~10 seconds)
 npm run dev                 # http://localhost:3000
 ```
 
-The app runs with **zero API keys**: card data comes from Riftcodex (free, no key).
+The app runs with **zero API keys**: card data comes from Riftcodex, TCGplayer prices from
+tcgcsv.com and exchange rates from Frankfurter (ECB) — all free. Local (Thailand) prices and manual
+overrides are entered by you. Settings → **Load demo data** builds a separate demo account to explore.
 
 ## Scripts
 
@@ -23,8 +26,9 @@ The app runs with **zero API keys**: card data comes from Riftcodex (free, no ke
 | --- | --- |
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run sync:cards` | Refresh the local card catalogue. Idempotent — safe to run daily. |
-| `npm test` | Vitest unit tests |
-| `npm run e2e` | Playwright smoke tests (needs `npm run build` and a synced catalogue first) |
+| `npm run sync:prices` | Daily price job (FX + TCGplayer). One snapshot per printing per source per day. |
+| `npm test` | Vitest unit tests (includes every worked example from the spec) |
+| `npm run e2e` | Playwright tests. Needs `npm run build`, synced cards and prices. Runs on a copy (`prisma/e2e.db`), never your data. |
 | `npm run typecheck` / `lint` | TypeScript / ESLint |
 
 ## Keeping card data fresh
@@ -36,7 +40,31 @@ The catalogue is stored locally and never fetched per page view. Refresh it once
   (e.g. a Vercel Cron entry). Without `CRON_SECRET` the endpoint only answers on localhost.
 - or press **Sync now** in Settings.
 
-The daily **price** job arrives in Phase 2 and will be documented here.
+## The daily price job
+
+`npm run sync:prices` (or `GET /api/cron/sync-prices`, same auth as above, or Settings → Update prices now):
+
+1. **FX** — USD→THB and USD→EUR from Frankfurter (ECB reference rates). A failure here doesn't stop
+   card prices; the last stored rate is used. Rates can be overridden in Settings.
+2. **TCGplayer** — catalogue + prices for category 89 from tcgcsv.com, which refreshes once a day
+   around 20:00 UTC (03:00 Bangkok). Schedule the job after that, e.g. `30 4 * * *` in Bangkok time.
+3. **Finishes** — TCGplayer prices Normal and Foil separately. Printings TCGplayer sells only as
+   foil become FOIL variants; printings sold both ways get both. Variants anyone owns are never touched.
+4. **Snapshots** — upserted on (printing, source, day), so re-running a day overwrites, never duplicates.
+   "Day" is the calendar day in Asia/Bangkok (`src/config/app.ts`).
+
+Prices TCGplayer lists that don't match a Riftcodex printing (sealed product, and sets Riftcodex
+hasn't added yet) are counted as "unmatched" and skipped.
+
+## Money rules
+
+- Every amount is integer minor units + currency. Purchases keep the currency actually paid; prices
+  keep their source currency. Conversion happens only for display.
+- **Landed cost**: an order's shipping, forwarding, duty and fees are spread over its lines by value
+  (`src/lib/money/landedCost.ts`); any rounding remainder goes to the most expensive item.
+- **Sales** consume purchases FIFO (`src/lib/money/fifo.ts`), using each lot's exact landed total.
+- **Valuation** = a manual override if you set one, else the chosen source (TCGplayer market, falling
+  back to mid then low; or your latest local report), × the condition multiplier from Settings.
 
 ## How card data is modelled
 

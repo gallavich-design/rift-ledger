@@ -7,8 +7,9 @@ import { useState } from "react";
 import { cn } from "@/lib/ui";
 import { CURRENT_PHASE, NAV } from "./nav";
 import { CommandPalette } from "./CommandPalette";
+import { DemoBanner } from "./DemoBanner";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, demo = false }: { children: React.ReactNode; demo?: boolean }) {
   const pathname = usePathname();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
@@ -89,7 +90,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
       </header>
 
-      <main className="min-w-0 pb-24 md:pb-10">{children}</main>
+      <main className="min-w-0 pb-24 md:pb-10">
+        {demo && <DemoBanner />}
+        {children}
+      </main>
 
       {/* Mobile bottom tab bar — only built screens */}
       <nav

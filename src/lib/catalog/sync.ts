@@ -6,11 +6,13 @@ import type { CardDataProvider } from "@/lib/providers/types";
 import { ROTATION_DATES, NON_STANDARD_SET_CODES } from "@/config/rotation";
 import { artOf, groupPrintings, normalizeForSearch, pipeJoin } from "./grouping";
 import { invalidateSearchIndex } from "./search";
+import { finishesFor, loadFinishMap, reconcileFinishes } from "./finishes";
+import { variantKey } from "./variantKey";
 
 export interface SyncResult {
   sets: number;
   cards: number;
-  variants: number;
+  variants: number; // printings processed
   removedVariants: number;
   ms: number;
 }
@@ -57,6 +59,7 @@ export async function syncCatalog(db: PrismaClient, provider: CardDataProvider, 
     const releaseDates = new Map(sets.map((s) => [s.code, s.releaseDate]));
     const groups = groupPrintings(printings, releaseDates);
 
+    const finishMap = await loadFinishMap(db);
     let variants = 0;
     for (let i = 0; i < groups.length; i += BATCH) {
       const chunk = groups.slice(i, i + BATCH);
@@ -98,11 +101,16 @@ export async function syncCatalog(db: PrismaClient, provider: CardDataProvider, 
               imageUrl: p.imageUrl,
               artist: p.artist,
             };
-            await tx.cardVariant.upsert({
-              where: { sourceId: p.sourceId },
-              update: vData,
-              create: { sourceId: p.sourceId, ...vData },
-            });
+            // A printing may already have several variants (NORMAL + FOIL, graded copies…):
+            // refresh shared printing data on all of them; create only when the printing is new.
+            const updated = await tx.cardVariant.updateMany({ where: { sourceId: p.sourceId, isUserCreated: false }, data: vData });
+            if (updated.count === 0) {
+              for (const finish of finishesFor(p.tcgplayerId, finishMap)) {
+                await tx.cardVariant.create({
+                  data: { sourceId: p.sourceId, variantKey: variantKey({ sourceId: p.sourceId, finish, language: "EN" }), finish, ...vData },
+                });
+              }
+            }
             variants++;
           }
         }
@@ -119,6 +127,8 @@ export async function syncCatalog(db: PrismaClient, provider: CardDataProvider, 
       (v) => !live.has(v.sourceId!) && v._count.lots + v._count.deckCards + v._count.watches === 0,
     );
     if (removable.length) await db.cardVariant.deleteMany({ where: { id: { in: removable.map((v) => v.id) } } });
+
+    await reconcileFinishes(db);
 
     // Cards left with no printings (e.g. upstream regrouped a name) and nothing pointing at them.
     await db.card.deleteMany({

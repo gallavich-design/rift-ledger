@@ -1,5 +1,41 @@
 # Changelog
 
+## Phase 2 — Portfolio (2026-10-26)
+
+### Schema migration `phase2_variant_key_tcg_products_lot_total`
+- `CardVariant.sourceId` no longer unique; new unique `variantKey` (printing|finish|language|grading|grade),
+  backfilled as `sourceId|NORMAL|EN||`. Lets one printing exist as both Normal and Foil.
+- New `TcgProduct` table (TCGplayer catalogue: finishes sold, single vs sealed).
+- New `Lot.landedTotal` (exact landed cost of a lot), backfilled as `landedUnitCost × quantity`.
+- Applied with a Prisma migration; no rows lost (1,451 variants before and after).
+
+### Added
+- Purchases: one form for a single card or a whole TCGplayer + forwarder order, with live landed-cost
+  preview; landed cost allocated by value (Example A). Order receipt page with per-line landed cost.
+- Sales: FIFO consumption with a live preview of which copies are sold and the realized P/L (Example B).
+- Collection: positions with cost, value (with source + time), P/L, storage location; filter by
+  location and set; move copies between locations from the card page.
+- Prices: TCGplayer via tcgcsv.com (daily, free), local Thailand price reports (THB, where seen, when),
+  manual override per printing. Daily idempotent price job + cron endpoint + "Update prices now".
+- Finish reconciliation from TCGplayer data: 704 printings corrected to foil-only, 454 foil variants added.
+- FX: daily USD→THB/EUR from Frankfurter (ECB) with per-currency override; display in THB/USD/EUR (Example E).
+- Dashboard: market value, cost basis, unrealized, realized, today's change; portfolio value vs cost
+  basis chart (1W–ALL) with crosshair tooltip and table view; top gainers/losers by % or amount;
+  biggest positions; breakdowns by set, rarity, domain, printing, finish, language, graded/raw;
+  valuation source switcher.
+- Card page: price headline, every source with its timestamp, multi-source price chart,
+  "Import or buy local?" (TCGplayer × your average landed-cost ratio vs latest local price), your copies.
+- Condition multipliers (NM/LP/MP/HP/DMG) in Settings.
+- Load demo data: a separate demo account (6 months of history, 4 orders, a sale, local reports) on
+  real cards, with its own DEMO price source and a persistent banner; never mixes with your data.
+- Chart palette validated for colour-blind separation; manual-override line uses a dashed neutral
+  encoding because no fourth hue clears every pair.
+
+### Tests
+- 62 unit tests incl. Examples A, B, E, FIFO edge cases, history/movers, import-vs-local, finish planner.
+- Browser tests now run on an isolated copy of the database (`prisma/e2e.db`); 11 new Phase 2 checks.
+
+
 ## Phase 1 — Foundation (2026-10-26)
 
 ### Added
