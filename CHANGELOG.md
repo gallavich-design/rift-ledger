@@ -12,10 +12,11 @@ No schema changes.
   remembered on this device.
 - **Sideboard** limit is now up to 10 cards (was exactly 0 or 8) — `gameRules.ts`, per the owner's
   update; still `TODO verify` whether it must be exactly 10.
-- Deck **Stats** panel (layout inspired by Piltover Archive): Cards / Avg energy / Avg power tiles,
-  energy and power curves with counts and hover details, a card-type bar (Unit / Spell / Gear) and
-  domain counts. Curves use one colour rather than domain stacks, because several domain colour
-  pairs can't be told apart by colour-blind readers.
+- Deck **Stats** panel (styled after Piltover Archive): Cards / Avg energy / Avg power tiles; energy
+  and power curves stacked by domain colour with a value axis, counts and a hover split; a Domains
+  bar with chips ("2 active") and a Card types bar with chips ("3 types"). Because some domain colour
+  pairs are close for colour-blind readers, segments have 2px gaps, every domain is named with its
+  count, hovers list the split, and a screen-reader table carries the numbers.
 
 
 ## Deck image as a card grid (2026-10-28)
