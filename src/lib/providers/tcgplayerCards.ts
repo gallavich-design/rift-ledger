@@ -2,7 +2,12 @@
 // yet — e.g. Radiance, released on TCGplayer on 2026-10-23 but absent from Riftcodex on 2026-10-28.
 // Every field comes from TCGplayer's product data; nothing is filled in from memory.
 //
-// Printings get sourceId "tcg:<productId>". When Riftcodex adds the set, the catalogue sync adopts
+// It also fills one known gap in sets Riftcodex does list: rune printings. On 2026-10-28 Riftcodex
+// had 30 rune printings (Origins, Vendetta, OP promos) while TCGplayer listed 91 — Spiritforged and
+// Unleashed runes, every set's alternate-art and promo runes. Runes TCGplayer lists that no Riftcodex
+// printing points at (by TCGplayer product id) are added from TCGplayer.
+//
+// Printings get sourceId "tcg:<productId>". When Riftcodex adds them, the catalogue sync adopts
 // these printings by TCGplayer product id (see sync.ts), so your lots, decks and watches carry over.
 
 import type { CardDataProvider, ProviderPrinting, ProviderSet } from "./types";
@@ -48,8 +53,9 @@ export function parseNumber(raw: string | undefined): { number: number | null; d
   const t = (raw ?? "").trim();
   const m = t.match(/^(\d+)([a-z]?)(\*?)\s*\/\s*(\d+)$/i);
   if (m) return { number: Number(m[1]), denominator: Number(m[4]), letter: !!m[2], star: !!m[3] };
+  // Runes: "R04" → 4, the way the card database numbers Vendetta's runes (1–6).
   const rune = t.match(/^R(\d+)([a-z]?)$/i);
-  if (rune) return { number: null, denominator: null, letter: !!rune[2], star: false };
+  if (rune) return { number: Number(rune[1]), denominator: null, letter: rune[2].toLowerCase() === "a", star: false };
   return { number: null, denominator: null, letter: false, star: false };
 }
 
@@ -67,6 +73,8 @@ export function normaliseName(name: string, cardType: string): { base: string; s
     else if (s.includes("alternate art") || s.includes("special art") || /^r\d+a$/i.test(m[1].trim())) kind = "alternate";
     else if (s === "ultimate") kind = "ultimate";
     if (kind) base = name.replace(SUFFIX, "").trim();
+    // Other rune suffixes are promo printings of the same rune: "(R01b)", "(R01c)", "(Vendetta)".
+    else if (/^rune$/i.test(cardType.trim())) base = name.replace(SUFFIX, "").trim();
   }
   // Legends and champions are written "Name, Title" on TCGplayer and "Name - Title" in the card
   // database; use the database's form so both sources show the same name.
@@ -97,6 +105,8 @@ export function tcgToPrinting(p: TcgRawProduct, setCode: string): ProviderPrinti
   return {
     sourceId: `${TCG_SOURCE_PREFIX}${p.productId}`,
     name: name.suffix ? `${name.base} (${name.suffix})` : name.base,
+    // Keep TCGplayer's own marker where it tells two printings apart, e.g. "Fury Rune (R01c)" vs "Fury Rune (Vendetta)".
+    ...(type === "Rune" && !name.suffix && SUFFIX.test(p.name) ? { printName: decode(p.name.trim()) } : {}),
     riftboundId: null,
     tcgplayerId: p.productId,
     collectorNumber: n.number,
@@ -141,10 +151,15 @@ function printedSetSize(products: TcgRawProduct[]): number {
  * A group counts as covered when the main provider lists its TCGplayer id or the same set code.
  * If TCGplayer can't be reached, the main provider's data is returned unchanged.
  */
-export function withTcgplayerFallback(primary: CardDataProvider, opts: { fetchGroupsFn?: () => Promise<TcgGroup[]>; fetchProductsFn?: (groupId: string) => Promise<TcgRawProduct[]> } = {}): CardDataProvider & { fallbackSets: () => string[] } {
+export function withTcgplayerFallback(
+  primary: CardDataProvider,
+  opts: { fetchGroupsFn?: () => Promise<TcgGroup[]>; fetchProductsFn?: (groupId: string) => Promise<TcgRawProduct[]> } = {},
+): CardDataProvider & { fallbackSets: () => string[]; tcgplayerReachable: () => boolean } {
   const getGroups = opts.fetchGroupsFn ?? fetchGroups;
   const getProducts = opts.fetchProductsFn ?? fetchRawProducts;
-  let cache: { sets: ProviderSet[]; printings: ProviderPrinting[] } | null = null;
+  let cache: { sets: ProviderSet[]; printings: ProviderPrinting[]; covered: { group: TcgGroup; code: string }[] } | null = null;
+  let runeCache: ProviderPrinting[] | null = null;
+  let reachable = true;
 
   async function fallback(primarySets: ProviderSet[]) {
     if (cache) return cache;
@@ -152,16 +167,22 @@ export function withTcgplayerFallback(primary: CardDataProvider, opts: { fetchGr
     const coveredCodes = new Set(primarySets.map((s) => s.code.toUpperCase()));
     const sets: ProviderSet[] = [];
     const printings: ProviderPrinting[] = [];
+    const covered: { group: TcgGroup; code: string }[] = [];
     let groups: TcgGroup[] = [];
     try {
       groups = await getGroups();
     } catch {
-      cache = { sets, printings };
+      reachable = false;
+      cache = { sets, printings, covered };
       return cache;
     }
     for (const g of groups) {
       const code = (g.abbreviation ?? "").toUpperCase();
-      if (!code || coveredIds.has(g.groupId) || coveredCodes.has(code)) continue;
+      if (!code) continue;
+      if (coveredIds.has(g.groupId) || coveredCodes.has(code)) {
+        covered.push({ group: g, code: primarySets.find((s) => s.tcgplayerId === g.groupId)?.code ?? code });
+        continue;
+      }
       let products: TcgRawProduct[];
       try {
         products = (await getProducts(g.groupId)).filter(isSingle);
@@ -173,21 +194,48 @@ export function withTcgplayerFallback(primary: CardDataProvider, opts: { fetchGr
       printings.push(...products.map((p) => tcgToPrinting(p, code)));
       await sleep(150);
     }
-    cache = { sets, printings };
+    cache = { sets, printings, covered };
     return cache;
+  }
+
+  /** Rune printings in sets the main provider covers, that none of its printings point at. */
+  async function runeGaps(primarySets: ProviderSet[], own: ProviderPrinting[]) {
+    if (runeCache) return runeCache;
+    const { covered } = await fallback(primarySets);
+    const known = new Set(own.map((p) => p.tcgplayerId).filter(Boolean));
+    const out: ProviderPrinting[] = [];
+    for (const { group, code } of covered) {
+      let products: TcgRawProduct[];
+      try {
+        products = await getProducts(group.groupId);
+      } catch {
+        reachable = false;
+        continue;
+      }
+      for (const p of products) if (isSingle(p) && (p.ext.get("Card Type") ?? "").trim() === "Rune" && !known.has(p.productId)) out.push(tcgToPrinting(p, code));
+      await sleep(150);
+    }
+    runeCache = out;
+    return out;
   }
 
   return {
     id: `${primary.id}+tcgplayer`,
     fallbackSets: () => cache?.sets.map((s) => s.code) ?? [],
+    /** False when TCGplayer couldn't be reached this run — the sync then keeps TCGplayer-sourced printings. */
+    tcgplayerReachable: () => reachable,
     async getSets() {
       const own = await primary.getSets();
       return [...own, ...(await fallback(own)).sets];
     },
     async getCards(setCode?: string) {
       const own = await primary.getCards(setCode);
-      const fb = await fallback(await primary.getSets());
-      return [...own, ...fb.printings.filter((p) => !setCode || p.setCode === setCode)];
+      const primarySets = await primary.getSets();
+      const fb = await fallback(primarySets);
+      // Rune gaps are judged against all of the main provider's printings, so a set-filtered call
+      // can't mistake another set's printing for a missing one.
+      const runes = await runeGaps(primarySets, setCode ? await primary.getCards() : own);
+      return [...own, ...[...fb.printings, ...runes].filter((p) => !setCode || p.setCode === setCode)];
     },
     searchCards: (q) => primary.searchCards(q),
     getCard: (id) => primary.getCard(id),

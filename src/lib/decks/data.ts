@@ -53,6 +53,13 @@ export async function loadDeckCards(db: PrismaClient, cardIds: string[]): Promis
   );
 }
 
+/** A printing's own marker from its name, when it isn't one the art label already says: "(R01c)", "(Vendetta)". */
+function marker(printName: string): string {
+  const m = printName.match(/\(([^)]*)\)\s*$/);
+  if (!m || /^(alternate art|signature|overnumbered|metal|ultimate)$/i.test(m[1].trim())) return "";
+  return ` (${m[1].trim()})`;
+}
+
 /** Prices per printing, in the display currency (manual override > chosen source). */
 export async function loadDeckPricing(
   db: PrismaClient,
@@ -67,6 +74,17 @@ export async function loadDeckPricing(
     where: { cardId: { in: cardIds } },
     include: { set: { select: { code: true, releaseDate: true } }, card: { select: { imageUrl: true } } },
   });
+  // Oldest set first, then by number, standard art before others, normal before foil.
+  const ART_RANK = ["STANDARD", "ALTERNATE", "OVERNUMBERED", "SIGNATURE", "PROMO", "METAL"];
+  variants.sort(
+    (a, b) =>
+      (a.set.releaseDate?.getTime() ?? Infinity) - (b.set.releaseDate?.getTime() ?? Infinity) ||
+      a.set.code.localeCompare(b.set.code) ||
+      (a.collectorNumber ?? 0) - (b.collectorNumber ?? 0) ||
+      ART_RANK.indexOf(a.art) - ART_RANK.indexOf(b.art) ||
+      a.printName.localeCompare(b.printName) ||
+      (a.finish === "FOIL" ? 1 : 0) - (b.finish === "FOIL" ? 1 : 0),
+  );
   const book = await getPriceBook(db, userId, variants.map((v) => v.id), source);
   const out = new Map<string, CardPricing>();
   for (const v of variants) {
@@ -76,7 +94,7 @@ export async function loadDeckPricing(
     const entry = out.get(v.cardId) ?? { cardId: v.cardId, defaultVariantId: null, variants: [] };
     entry.variants.push({
       variantId: v.id,
-      label: `${v.set.code}·${String(v.collectorNumber ?? "").padStart(3, "0")} ${ART_LABEL[v.art as VariantArt] ?? v.art} ${v.finish === "FOIL" ? "Foil" : "Normal"}${v.gradingCompany ? ` ${v.gradingCompany} ${v.grade ?? ""}` : ""}`.trim(),
+      label: `${v.set.code}·${String(v.collectorNumber ?? "").padStart(3, "0")} ${ART_LABEL[v.art as VariantArt] ?? v.art}${marker(v.printName)} ${v.finish === "FOIL" ? "Foil" : "Normal"}${v.gradingCompany ? ` ${v.gradingCompany} ${v.grade ?? ""}` : ""}`.trim(),
       unit,
       imageUrl: v.imageUrl ?? v.card.imageUrl,
       art: v.art,

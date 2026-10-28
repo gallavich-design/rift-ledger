@@ -76,7 +76,7 @@ export function DeckGallery({ lines, cards, owned, edit, issues, printings, form
           data-testid="gallery-card"
         >
           {img ? (
-            <FramedImage src={img} alt="" landscape={variant === "wide"} />
+            <FramedImage src={img} alt="" landscape={variant === "wide"} fallbackSrc={c.imageUrl} missingLabel={c.name} />
           ) : (
             <span className="absolute inset-0 grid place-items-center p-2 text-center text-xs text-ink-2">{c.name}</span>
           )}
@@ -189,7 +189,7 @@ function CardDialog({ line, card: c, owned, edit, issue, cardLinks, printings, f
           <X size={16} />
         </button>
         <div className={cn("relative mx-auto mt-9 w-full max-w-[300px] overflow-hidden sm:mt-0 rounded-[12px] bg-inset ring-1 ring-rule", c.orientation === "landscape" ? "aspect-[1039/744]" : "aspect-[744/1039]")}>
-          {img && <FramedImage src={img} alt={`${c.name}${pr?.art && pr.art !== "STANDARD" ? ` (${artName(pr.art)})` : ""}`} landscape={c.orientation === "landscape"} loading="eager" />}
+          {img && <FramedImage src={img} alt={`${c.name}${pr?.art && pr.art !== "STANDARD" ? ` (${artName(pr.art)})` : ""}`} landscape={c.orientation === "landscape"} loading="eager" fallbackSrc={c.imageUrl} missingLabel={c.name} />}
         </div>
         <div className="min-w-0 space-y-4">
           <div className="pr-10">
@@ -256,7 +256,7 @@ function CardDialog({ line, card: c, owned, edit, issue, cardLinks, printings, f
                           title={`${artName(v.art)} · ${v.number ?? ""}`}
                           className={cn("relative block w-[54px] overflow-hidden rounded-[6px] bg-inset ring-1 ring-rule", c.orientation === "landscape" ? "aspect-[1039/744] w-[76px]" : "aspect-[744/1039]", on && "ring-2 ring-quill")}
                         >
-                          {v.imageUrl && <FramedImage src={v.imageUrl} alt="" landscape={c.orientation === "landscape"} />}
+                          {v.imageUrl && <FramedImage src={v.imageUrl} alt="" landscape={c.orientation === "landscape"} missingLabel={`${v.number ?? ""} no picture`} />}
                           {on && <span className="absolute inset-x-0 bottom-0 bg-quill py-px text-center text-[9px] font-semibold text-white">In deck</span>}
                         </button>
                       </li>

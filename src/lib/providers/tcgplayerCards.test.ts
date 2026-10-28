@@ -46,8 +46,18 @@ describe("TCGplayer card data → printings", () => {
     expect(alt).toMatchObject({ name: "Some Unit (Alternate Art)", collectorNumber: 61 });
     expect(artOf(alt)).toBe("ALTERNATE");
     const rune = tcgToPrinting(prod(5, "Calm Rune (R02a)", { Number: "R02a", "Card Type": "Rune", Domain: "Calm" }), "RAD");
-    expect(rune).toMatchObject({ name: "Calm Rune (Alternate Art)", type: "Rune", supertype: "Basic", collectorNumber: null });
+    expect(rune).toMatchObject({ name: "Calm Rune (Alternate Art)", type: "Rune", supertype: "Basic", collectorNumber: 2 });
     expect(cardKey(rune)).toBe(cardKey({ name: "Calm Rune", type: "Rune" }));
+    expect(artOf(rune)).toBe("ALTERNATE");
+    // Promo runes: "(R01b)", "(R01c)" and "(Vendetta)" are the same rune, printed as a promo.
+    const promoB = tcgToPrinting(prod(7, "Fury Rune (R01b)", { Number: "R01b", "Card Type": "Rune", Domain: "Fury", Rarity: "Promo" }), "SFD");
+    expect(promoB).toMatchObject({ name: "Fury Rune", printName: "Fury Rune (R01b)", collectorNumber: 1 });
+    expect(artOf(promoB)).toBe("PROMO");
+    const ven = tcgToPrinting(prod(8, "Body Rune (Vendetta)", { Number: "R04b", "Card Type": "Rune", Domain: "Body", Rarity: "Common" }), "OPP");
+    expect(ven).toMatchObject({ name: "Body Rune", printName: "Body Rune (Vendetta)", collectorNumber: 4 });
+    expect(tcgToPrinting(kaisa, "RAD").printName).toBeUndefined();
+    expect(artOf(ven)).toBe("PROMO"); // OP promo set
+    expect(artOf(tcgToPrinting(prod(9, "Order Rune (R06c)", { Number: "R06c", "Card Type": "Rune", Rarity: "Promo" }), "OPP"))).toBe("PROMO");
     const bf = tcgToPrinting(prod(6, "Cosmic Vista", { Number: "160/167", "Card Type": "Battlefield", Domain: "None" }), "RAD");
     expect(bf).toMatchObject({ domains: ["Colorless"], orientation: "landscape" });
   });
@@ -85,8 +95,27 @@ describe("fallback to TCGplayer for sets the card database lacks", () => {
     expect(cards.every((c) => c.setCode === "RAD")).toBe(true);
   });
 
-  it("keeps working when TCGplayer is unreachable", async () => {
+  it("keeps working when TCGplayer is unreachable, and says so", async () => {
     const p = withTcgplayerFallback(primary, { fetchGroupsFn: async () => { throw new Error("down"); } });
     expect((await p.getSets()).map((s) => s.code)).toEqual(["VEN"]);
+    expect(p.tcgplayerReachable()).toBe(false);
+    expect(await p.getCards()).toEqual([]);
+  });
+
+  it("adds runes the card database lacks in sets it covers, and only those", async () => {
+    const venRune = (id: number, name: string, num: string) => prod(id, name, { Number: num, "Card Type": "Rune", Rarity: "Common", Domain: "Fury" });
+    const covering: CardDataProvider = {
+      ...primary,
+      // The card database already has the Vendetta Fury Rune (TCGplayer product 706028).
+      getCards: async () => [{ ...tcgToPrinting(venRune(706028, "Fury Rune", "R01"), "VEN"), sourceId: "rc-fury" }],
+    };
+    const p = withTcgplayerFallback(covering, {
+      fetchGroupsFn: async () => [groups[1]],
+      fetchProductsFn: async () => [venRune(706028, "Fury Rune", "R01"), venRune(709312, "Fury Rune (R01a)", "R01a"), prod(1, "Some Unit", { Number: "001/221", "Card Type": "Unit" })],
+    });
+    const cards = await p.getCards();
+    expect(cards.map((c) => c.sourceId)).toEqual(["rc-fury", "tcg:709312"]); // only the missing alt-art rune; units untouched
+    expect(cards[1]).toMatchObject({ setCode: "VEN", name: "Fury Rune (Alternate Art)", collectorNumber: 1 });
+    expect(p.tcgplayerReachable()).toBe(true);
   });
 });

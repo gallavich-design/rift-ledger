@@ -32,6 +32,8 @@ export interface ProviderPrinting {
   tags: string[];
   orientation: string;
   flags: { alternateArt: boolean; overnumbered: boolean; signature: boolean };
+  /** Name to show for this printing when it differs from `name` (which groups printings into cards). */
+  printName?: string;
 }
 
 export interface CardDataProvider {

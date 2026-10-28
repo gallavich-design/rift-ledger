@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-28 — Every rune printing, from every set
+
+No schema changes. Press **Sync now** in Settings (then **Update prices**) to pull them in.
+
+- Riftcodex lists 30 rune printings (Origins, Vendetta, OP promos); TCGplayer lists 90. The catalogue sync now adds the runes Riftcodex is missing from TCGplayer — Spiritforged and Unleashed runes, Vendetta's alternate-art runes, and the OP promo runes (R0xc and the "Vendetta" ones) — matched by TCGplayer product id, so nothing is doubled and they're adopted automatically if Riftcodex adds them later.
+- TCGplayer's rune suffixes are understood: "(R01a)" is alternate art; "(R01b)", "(R01c)" and "(Vendetta)" are promo printings of the same rune. Runes get their number from "R04" (as 4), so Radiance runes no longer show without a number.
+- The printing picker lists printings oldest set first and names look-alikes apart ("Promo (R02c)" vs "Promo (Vendetta)").
+- A few TCGplayer products have no picture: the picker shows them as a labelled tile, and the deck falls back to the card's normal art.
+- Safety: if TCGplayer can't be reached during a sync, printings that came from it are kept instead of being removed as "gone upstream".
+
 ## 2026-10-28 — Battlefield pictures face the right way
 
 - Fixed: Radiance battlefields (e.g. Hunters' Circle RAD-163) showed sideways and cropped. Their pictures come from TCGplayer, which stores battlefields upright, while Riftcodex stores them landscape. Card pictures now check which way each image faces and turn it to fit the frame — on the deck view and pop-up, card browser, card page, collection, binder, watchlist and dashboard.

@@ -1,4 +1,4 @@
-// Card catalog sync: Riftcodex (+ TCGplayer for sets Riftcodex doesn't list yet) → local DB. Idempotent — upserts keyed by Set.code, Card.key and
+// Card catalog sync: Riftcodex (+ TCGplayer for sets and rune printings Riftcodex doesn't list yet) → local DB. Idempotent — upserts keyed by Set.code, Card.key and
 // CardVariant.sourceId, so re-running never creates duplicates.
 
 import type { PrismaClient } from "@prisma/client";
@@ -97,7 +97,7 @@ export async function syncCatalog(db: PrismaClient, provider: CardDataProvider, 
               riftboundId: p.riftboundId,
               tcgplayerId: p.tcgplayerId,
               collectorNumber: p.collectorNumber,
-              printName: p.name,
+              printName: p.printName ?? p.name,
               rarity: p.rarity,
               art: artOf(p),
               imageUrl: p.imageUrl,
@@ -141,8 +141,11 @@ export async function syncCatalog(db: PrismaClient, provider: CardDataProvider, 
       where: { sourceId: { not: null }, isUserCreated: false },
       select: { id: true, sourceId: true, _count: { select: { lots: true, deckCards: true, watches: true } } },
     });
+    // If TCGplayer couldn't be reached this run, its printings are missing from `live` for that
+    // reason only — keep them rather than treat them as gone.
+    const tcgDown = "tcgplayerReachable" in provider && typeof provider.tcgplayerReachable === "function" && !provider.tcgplayerReachable();
     const removable = stale.filter(
-      (v) => !live.has(v.sourceId!) && v._count.lots + v._count.deckCards + v._count.watches === 0,
+      (v) => !live.has(v.sourceId!) && v._count.lots + v._count.deckCards + v._count.watches === 0 && !(tcgDown && v.sourceId!.startsWith(TCG_SOURCE_PREFIX)),
     );
     if (removable.length) await db.cardVariant.deleteMany({ where: { id: { in: removable.map((v) => v.id) } } });
 
