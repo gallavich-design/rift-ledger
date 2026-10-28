@@ -323,7 +323,7 @@ export async function completeSet(payload: CompleteSetPayload): Promise<Result<{
         const loc = await resolveBinder(tx, userId, o.binder);
         let moved = 0;
         if (o.moveOwned && loc.id) {
-          const r = await tx.lot.updateMany({ where: { userId, remainingQuantity: { gt: 0 }, variantId: { in: setVariantIds }, NOT: { storageLocationId: loc.id } }, data: { storageLocationId: loc.id } });
+          const r = await tx.lot.updateMany({ where: { userId, remainingQuantity: { gt: 0 }, variantId: { in: setVariantIds }, OR: [{ storageLocationId: null }, { storageLocationId: { not: loc.id } }] }, data: { storageLocationId: loc.id } });
           moved = r.count;
         }
         let orderId: string | null = null;
@@ -332,11 +332,12 @@ export async function completeSet(payload: CompleteSetPayload): Promise<Result<{
             data: { userId, orderedOn: acquiredOn, seller: `Complete the set: ${set.name}`.slice(0, 120), currency: market.currency, notes: `Added with “Complete the set” in the set binder (${o.scope === "all" ? "every printing" : "base set"}).` },
           });
           orderId = order.id;
-          for (const t of toAdd) {
-            const price = market.unit(t.variantId);
-            const unit = o.cost === "market" ? (price ?? 0) : 0;
-            await tx.lot.create({
-              data: {
+          // One bulk insert: keeps the database lock short even for a few hundred cards.
+          await tx.lot.createMany({
+            data: toAdd.map((t) => {
+              const price = market.unit(t.variantId);
+              const unit = o.cost === "market" ? (price ?? 0) : 0;
+              return {
                 userId,
                 orderId: order.id,
                 variantId: t.variantId,
@@ -350,13 +351,13 @@ export async function completeSet(payload: CompleteSetPayload): Promise<Result<{
                 acquiredOn,
                 storageLocationId: loc.id,
                 notes: o.cost === "market" ? (price != null ? "cost = market price when added" : "no price — cost 0") : "cost not recorded",
-              },
-            });
-          }
+              };
+            }),
+          });
         }
         return { orderId, added: toAdd.length, moved, binder: loc.name };
       },
-      { timeout: 60_000 },
+      { timeout: 30_000 },
     );
     refresh();
     const parts = [result.added ? `Added ${result.added} ${result.added === 1 ? "card" : "cards"}` : null, result.moved ? `moved ${result.moved} ${result.moved === 1 ? "purchase" : "purchases"} you already had` : null].filter(Boolean);

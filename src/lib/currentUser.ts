@@ -10,13 +10,21 @@ const LOCAL_EMAIL = "owner@local";
 export const DEMO_EMAIL = "demo@local";
 export const DEMO_COOKIE = "rl_demo";
 
+// Read first; create only on the very first request. Page loads must not write: on SQLite a write
+// waits for any running save (e.g. "Complete the set") and can time out.
+let ownerIdCache: string | null = null;
 export async function getOwnerId(): Promise<string> {
-  const user = await db.user.upsert({
-    where: { email: LOCAL_EMAIL },
-    update: {},
-    create: { email: LOCAL_EMAIL, name: "Owner", settings: { create: {} } },
-    select: { id: true },
-  });
+  if (ownerIdCache) return ownerIdCache;
+  const found = await db.user.findUnique({ where: { email: LOCAL_EMAIL }, select: { id: true } });
+  const user =
+    found ??
+    (await db.user.upsert({
+      where: { email: LOCAL_EMAIL },
+      update: {},
+      create: { email: LOCAL_EMAIL, name: "Owner", settings: { create: {} } },
+      select: { id: true },
+    }));
+  ownerIdCache = user.id;
   return user.id;
 }
 

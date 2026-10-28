@@ -288,10 +288,11 @@ export async function markDeckOwned(payload: MarkOwnedPayload): Promise<Result<{
         data: { userId, orderedOn: acquiredOn, seller: `From deck: ${deck.name}`.slice(0, 120), currency: display, notes: "Added with “I own all of these” on the deck page." },
       });
       id = order.id;
-      for (const s of short) {
-        const unit = o.cost === "market" ? (s.unit ?? 0) : 0;
-        await tx.lot.create({
-          data: {
+      // One bulk insert, so the database lock stays short.
+      await tx.lot.createMany({
+        data: short.map((s) => {
+          const unit = o.cost === "market" ? (s.unit ?? 0) : 0;
+          return {
             userId,
             orderId: order.id,
             variantId: s.variantId!,
@@ -304,9 +305,9 @@ export async function markDeckOwned(payload: MarkOwnedPayload): Promise<Result<{
             condition: "NM",
             acquiredOn,
             notes: o.cost === "market" ? (s.unit != null ? "cost = market price when marked owned" : "no price — cost 0") : "cost not recorded",
-          },
-        });
-      }
+          };
+        }),
+      });
     }
     if (clearProxies) await tx.deckCard.updateMany({ where: { deckId: deck.id }, data: { proxyQuantity: 0 } });
     return id;

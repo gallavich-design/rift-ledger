@@ -24,7 +24,8 @@ function parseJson<T>(s: string, fallback: T): T {
 }
 
 export async function getSettings(db: PrismaClient, userId: string): Promise<UserSettings> {
-  const s = await db.settings.upsert({ where: { userId }, update: {}, create: { userId } });
+  // Read first (page loads shouldn't write); create the row only if it's missing.
+  const s = (await db.settings.findUnique({ where: { userId } })) ?? (await db.settings.upsert({ where: { userId }, update: {}, create: { userId } }));
   return {
     displayCurrency: s.displayCurrency,
     defaultValuationSource: s.defaultValuationSource,

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-28 — Fix: "Application error" after Complete the set
+
+No schema changes.
+
+- Fixed: "Complete the set" on a big set could make the next page fail with "Application error" (database timeout, P1008). It saved cards one by one inside a transaction, which held SQLite's write lock while every page load also wrote to the database (making sure the owner and settings rows exist) — those writes timed out.
+- Page loads no longer write: the owner and settings are read first and only created if missing.
+- "Complete the set" and "I own all of these" save their cards in one bulk insert, so the lock lasts milliseconds.
+- The server turns on SQLite WAL mode at start, so pages keep reading while something is being saved.
+- Fixed: "Also move the cards I already own" skipped cards that weren't in any binder yet.
+
 ## 2026-10-28 — Add to collection, Complete the set
 
 No schema changes (binders are your storage locations).
