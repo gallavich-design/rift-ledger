@@ -268,6 +268,12 @@ export default async function CardPage({ params, searchParams }: { params: Promi
             </h2>
             <RulesText rich={card.rulesTextRich} plain={card.rulesText} />
             {card.flavourText && <p className="mt-4 border-t border-rule-soft pt-3 text-sm text-ink-3 italic">{card.flavourText}</p>}
+            {card.set.sourceId?.startsWith("tcg:") && (
+              <p className="mt-4 border-t border-rule-soft pt-3 text-xs text-ink-3" data-testid="tcg-card-data">
+                Card details from TCGplayer — the card database (Riftcodex) hasn&rsquo;t added {card.set.name} yet. Costs show as numbers rather than
+                symbols. They switch to the official data automatically once it&rsquo;s added.
+              </p>
+            )}
           </section>
 
           {/* ── Rulings ── */}

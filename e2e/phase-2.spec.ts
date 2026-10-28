@@ -47,9 +47,13 @@ async function pickCard(page: Page, lineIndex: number, name: string) {
   const input = page.getByPlaceholder("Type a card name").nth(0);
   await input.fill(name);
   await page.getByRole("option", { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
-  const printing = page.getByRole("listbox", { name: /Which printing/ });
-  if (await printing.isVisible().catch(() => false)) await printing.getByRole("option").first().click();
-  await expect(page.getByRole("button", { name: `Change card (${name})` })).toBeVisible();
+  // Single-printing cards are picked automatically; otherwise choose the first printing.
+  // (Wait for one or the other — the printing list shows briefly while it loads either way.)
+  const done = page.getByRole("button", { name: `Change card (${name})` });
+  const option = page.getByRole("listbox", { name: /Which printing/ }).getByRole("option").first();
+  await expect(done.or(option)).toBeVisible();
+  if (!(await done.isVisible())) await option.click();
+  await expect(done).toBeVisible();
   void lineIndex;
 }
 

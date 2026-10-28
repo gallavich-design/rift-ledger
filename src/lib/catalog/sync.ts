@@ -1,4 +1,4 @@
-// Card catalog sync: Riftcodex → local DB. Idempotent — upserts keyed by Set.code, Card.key and
+// Card catalog sync: Riftcodex (+ TCGplayer for sets Riftcodex doesn't list yet) → local DB. Idempotent — upserts keyed by Set.code, Card.key and
 // CardVariant.sourceId, so re-running never creates duplicates.
 
 import type { PrismaClient } from "@prisma/client";
@@ -8,6 +8,7 @@ import { artOf, groupPrintings, normalizeForSearch, pipeJoin } from "./grouping"
 import { invalidateSearchIndex } from "./search";
 import { finishesFor, loadFinishMap, reconcileFinishes } from "./finishes";
 import { variantKey } from "./variantKey";
+import { TCG_SOURCE_PREFIX } from "@/lib/providers/tcgplayerCards";
 
 export interface SyncResult {
   sets: number;
@@ -104,7 +105,23 @@ export async function syncCatalog(db: PrismaClient, provider: CardDataProvider, 
             };
             // A printing may already have several variants (NORMAL + FOIL, graded copies…):
             // refresh shared printing data on all of them; create only when the printing is new.
-            const updated = await tx.cardVariant.updateMany({ where: { sourceId: p.sourceId, isUserCreated: false }, data: vData });
+            let updated = await tx.cardVariant.updateMany({ where: { sourceId: p.sourceId, isUserCreated: false }, data: vData });
+            // The main database just added a printing we'd been carrying from TCGplayer: adopt those
+            // variants (same TCGplayer product) so lots, decks and watches keep pointing at them.
+            if (updated.count === 0 && p.tcgplayerId && !p.sourceId.startsWith(TCG_SOURCE_PREFIX)) {
+              const interim = await tx.cardVariant.findMany({ where: { sourceId: `${TCG_SOURCE_PREFIX}${p.tcgplayerId}` } });
+              for (const v of interim) {
+                await tx.cardVariant.update({
+                  where: { id: v.id },
+                  data: {
+                    sourceId: p.sourceId,
+                    variantKey: variantKey({ sourceId: p.sourceId, finish: v.finish, language: v.language, gradingCompany: v.gradingCompany, grade: v.grade }),
+                    ...(v.isUserCreated ? { cardId: card.id, setId: vData.setId } : vData),
+                  },
+                });
+              }
+              updated = { count: interim.filter((v) => !v.isUserCreated).length };
+            }
             if (updated.count === 0) {
               for (const finish of finishesFor(p.tcgplayerId, finishMap)) {
                 await tx.cardVariant.create({

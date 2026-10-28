@@ -10,7 +10,7 @@ import { CONDITIONS, CURRENCIES, STORAGE_TYPES } from "@/lib/domain/enums";
 import { runPriceJob } from "@/lib/prices/job";
 import { clearDemo, seedDemo } from "@/lib/demo/seed";
 import { syncCatalog } from "@/lib/catalog/sync";
-import { riftcodex } from "@/lib/providers/riftcodex";
+import { catalogProvider } from "@/lib/providers/catalog";
 
 export interface ActionState {
   ok: boolean;
@@ -80,7 +80,7 @@ export async function deleteLocation(id: string): Promise<void> {
 
 export async function runCatalogSync(): Promise<ActionState> {
   try {
-    const r = await syncCatalog(db, riftcodex);
+    const r = await syncCatalog(db, catalogProvider());
     revalidatePath("/", "layout");
     return {
       ok: true,

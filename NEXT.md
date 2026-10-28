@@ -16,7 +16,9 @@
 - Historical FX: values convert at the latest rate. A purchase's THB cost at the time it was paid
   could be stored per order if wanted.
 - Today's change and movers use near-mint prices (condition multipliers apply to totals, not to deltas).
-- Three TCGplayer groups (Legacy, Radiance, Secret Garden) aren't in Riftcodex yet, so they can't be priced.
+- Small TCGplayer promo bundles that Riftcodex doesn't list (Secret Garden, T1 Worlds Champion bundles,
+  Worlds Bundle 2025) aren't in the catalogue. Full sets missing from Riftcodex (Radiance) come from
+  TCGplayer's data until Riftcodex adds them.
 
 ## Deferred from Phase 3
 - **Piltover Archive import** — `piltoverarchive.com/api/external/v1/decks` answers, but the site's
@@ -51,7 +53,7 @@
 
 ## Verify before relying on them (`TODO verify`)
 - `src/config/gameRules.ts` — sourced from Core Rules §103 on 2026-10-26; only the sideboard size (0 or 8) is still `TODO verify`.
-- `src/config/rotation.ts` — rotation dates and which set codes count as Sets 1–5.
+- `src/config/rotation.ts` — rotation dates and which set codes count as Sets 1–5 (Radiance has none yet).
 - `src/config/domains.ts` — domain hues vs official iconography.
 
 ## Future (spec §9 — not scheduled)

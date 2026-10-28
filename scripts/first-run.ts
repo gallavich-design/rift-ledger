@@ -2,14 +2,14 @@
 // syncs cards and today's prices once. Otherwise does nothing; the daily schedule keeps data fresh.
 import { PrismaClient } from "@prisma/client";
 import { syncCatalog } from "../src/lib/catalog/sync";
-import { riftcodex } from "../src/lib/providers/riftcodex";
+import { catalogProvider } from "../src/lib/providers/catalog";
 import { runPriceJob } from "../src/lib/prices/job";
 
 const db = new PrismaClient();
 (async () => {
   if ((await db.card.count()) > 0) return;
   console.log("[first-run] empty catalogue — syncing cards…");
-  const c = await syncCatalog(db, riftcodex);
+  const c = await syncCatalog(db, catalogProvider());
   console.log("[first-run] cards synced", JSON.stringify(c).slice(0, 200));
   const p = await runPriceJob(db);
   console.log(`[first-run] prices for ${p.day}: ${p.snapshots} snapshots, ${p.sealedSnapshots} sealed`);

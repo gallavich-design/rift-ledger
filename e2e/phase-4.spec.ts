@@ -107,7 +107,16 @@ test("a rotation date shows 'rotates in N months' on decks and the rotating valu
 test("importing 3 meta decks shows % owned and cost to complete, and sorting by cheapest works", async ({ page }) => {
   // three lists of very different cost: the e2e deck, a cheap-cards list, a pricier one
   const cheap = await db.priceSnapshot.findMany({ where: { source: "TCGPLAYER", market: { lt: 30 } }, include: { variant: { include: { card: true } } }, take: 300 });
-  const dear = await db.priceSnapshot.findMany({ where: { source: "TCGPLAYER", market: { gt: 2000 } }, include: { variant: { include: { card: true } } }, take: 300 });
+  // "dear" = every printing of the card costs over $20 (cost to complete uses the cheapest printing)
+  const pricey = await db.priceSnapshot.findMany({ where: { source: "TCGPLAYER", market: { gt: 2000 } }, include: { variant: { include: { card: true } } }, take: 600 });
+  const cheapest = await db.priceSnapshot.groupBy({ by: ["variantId"], where: { source: "TCGPLAYER", variant: { cardId: { in: [...new Set(pricey.map((r) => r.variant.cardId))] } } }, _min: { market: true } });
+  const variantCard = new Map((await db.cardVariant.findMany({ where: { id: { in: cheapest.map((c) => c.variantId) } }, select: { id: true, cardId: true } })).map((v) => [v.id, v.cardId]));
+  const minByCard = new Map<string, number>();
+  for (const c of cheapest) {
+    const card = variantCard.get(c.variantId)!;
+    minByCard.set(card, Math.min(minByCard.get(card) ?? Infinity, c._min.market ?? Infinity));
+  }
+  const dear = pricey.filter((r) => (minByCard.get(r.variant.cardId) ?? 0) > 2000);
   const names = (rows: typeof cheap) => [...new Set(rows.map((r) => r.variant.card.name).filter((n) => !n.includes("//") && !n.includes("(")))].slice(0, 5);
   const lists = [
     { archetype: "E2E Meta Owned", text: list.text },

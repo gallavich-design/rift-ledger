@@ -1,11 +1,11 @@
 // Usage: npm run sync:cards   (safe to run daily from cron — idempotent)
 import { PrismaClient } from "@prisma/client";
 import { syncCatalog } from "../src/lib/catalog/sync";
-import { riftcodex } from "../src/lib/providers/riftcodex";
+import { catalogProvider } from "../src/lib/providers/catalog";
 
 const db = new PrismaClient();
 
-syncCatalog(db, riftcodex)
+syncCatalog(db, catalogProvider())
   .then((r) => {
     console.log(`Synced ${r.sets} sets, ${r.cards} cards, ${r.variants} printings (${r.removedVariants} removed) in ${r.ms} ms`);
   })

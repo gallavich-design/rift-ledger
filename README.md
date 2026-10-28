@@ -90,7 +90,10 @@ Foil/normal finishes aren't in Riftcodex; they'll come from the TCGplayer price 
 
 Interfaces live in `src/lib/providers/types.ts`:
 
-- `CardDataProvider` — sets and printings (implemented: `riftcodex.ts`)
+- `CardDataProvider` — sets and printings (implemented: `riftcodex.ts`; `tcgplayerCards.ts` wraps it
+  so any full set TCGplayer lists but Riftcodex doesn't yet — e.g. Radiance — is still in the
+  catalogue, built from TCGplayer's own card fields. Those printings are `tcg:<productId>`; when
+  Riftcodex adds the set, the sync adopts them by TCGplayer product id, so nothing you own moves.)
 - `PriceProvider` — prices per variant (Phase 2: TCGplayer via tcgcsv.com, manual, local)
 - `DecklistProvider` — tournament decklists (Phase 4)
 

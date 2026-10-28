@@ -9,6 +9,8 @@ export const ROTATION_DATES: Record<string, string> = {
   SFD: "2028-01-01", // TODO verify
   UNL: "2028-01-01", // TODO verify
   VEN: "2028-01-01", // TODO verify — assumed to be Set 4 (or 5)
+  // RAD (Radiance, 2026-10-23): no date set — it isn't known here whether it's among "Sets 1–5".
+  // TODO verify, then add it (or record a rotation ruling in News & Alerts, which overrides this).
 };
 
 /** Promo sets aren't a Standard product; their cards follow the card's main-set legality. TODO verify. */

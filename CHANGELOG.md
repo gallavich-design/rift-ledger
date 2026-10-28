@@ -1,5 +1,21 @@
 # Changelog
 
+## Radiance in the catalogue (2026-10-28)
+
+No schema changes.
+
+- Riftcodex (the card database) doesn't list Radiance yet. The card sync now also reads TCGplayer's
+  card data (via tcgcsv.com) for any full set Riftcodex is missing: name, type, domains, costs,
+  might, text, tags, rarity, number, printing (alternate art, overnumbered, signature) and image.
+  Radiance: 167 new cards plus 11 reprints, 333 printings, all with TCGplayer prices.
+- When Riftcodex adds such a set, the sync switches those printings to Riftcodex's data in place
+  (matched by TCGplayer product id), so lots, decks and watches keep working.
+- Card pages built from TCGplayer data say so (costs show as numbers, not symbols).
+- Bundles with only a few promo cards (Secret Garden, T1 Worlds bundles, Worlds Bundle 2025) are
+  not added this way; Legacy (Jan 2027) will be once TCGplayer lists its cards.
+- Radiance has no Standard rotation date yet (`TODO verify` in `config/rotation.ts`).
+
+
 ## Speed-ups (2026-10-28)
 
 No schema changes.

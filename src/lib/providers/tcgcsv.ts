@@ -42,6 +42,15 @@ export interface TcgGroup {
   groupId: string;
   name: string;
   abbreviation: string | null;
+  publishedOn: Date | null;
+}
+
+/** A product with all of TCGplayer's card fields (Card Type, Domain, Description…). */
+export interface TcgRawProduct {
+  productId: string;
+  name: string;
+  imageUrl: string | null;
+  ext: Map<string, string>;
 }
 
 export interface TcgProductRow {
@@ -82,7 +91,12 @@ async function get<T extends z.ZodTypeAny>(path: string, item: T): Promise<z.inf
 
 export async function fetchGroups(): Promise<TcgGroup[]> {
   const groups = await get(`/${RIFTBOUND_CATEGORY_ID}/groups`, Group);
-  return groups.map((g) => ({ groupId: String(g.groupId), name: g.name, abbreviation: g.abbreviation ?? null }));
+  return groups.map((g) => ({ groupId: String(g.groupId), name: g.name, abbreviation: g.abbreviation ?? null, publishedOn: g.publishedOn ? new Date(g.publishedOn + "Z") : null }));
+}
+
+export async function fetchRawProducts(groupId: string): Promise<TcgRawProduct[]> {
+  const products = await get(`/${RIFTBOUND_CATEGORY_ID}/${groupId}/products`, Product);
+  return products.map((p) => ({ productId: String(p.productId), name: p.name, imageUrl: p.imageUrl ?? null, ext: new Map((p.extendedData ?? []).map((e) => [e.name, e.value])) }));
 }
 
 export async function fetchGroup(group: TcgGroup): Promise<{ products: TcgProductRow[]; prices: TcgPriceRow[]; unknownSubTypes: string[] }> {
