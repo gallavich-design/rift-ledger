@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-28 — Chosen Champion beside the Legend
+
+- In the Cards view the Chosen Champion now has its own spot to the right of the Legend (Legend · Champion · Runes). It still counts toward the main deck, which reads "40/40 incl. Chosen Champion".
+
 ## 2026-10-28 — Pick a card's printing from the deck view
 
 No schema changes (uses the existing per-line preferred printing).

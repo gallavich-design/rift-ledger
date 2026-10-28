@@ -65,6 +65,10 @@ test("the deck shows as card pictures; clicking one opens its details", async ({
   const gallery = page.getByTestId("deck-gallery");
   await expect(gallery.getByRole("region", { name: "Runes" })).toContainText("12/12");
   await expect(gallery.getByRole("region", { name: "Battlefields" })).toContainText("3/3");
+  // the Chosen Champion sits beside the Legend and still counts toward the main deck
+  await expect(gallery.getByRole("region", { name: "Chosen Champion" })).toContainText("1/1");
+  await expect(gallery.getByRole("region", { name: "Chosen Champion" }).getByTestId("gallery-card")).toHaveCount(1);
+  await expect(gallery.getByRole("region", { name: "Main deck" })).toContainText("40/40");
   const card = list.main[0];
   await gallery.getByRole("button", { name: new RegExp(`^${card.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}, \\d`) }).first().click();
   const dialog = page.getByTestId("card-dialog");

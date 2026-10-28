@@ -45,7 +45,8 @@ export function DeckGallery({ lines, cards, owned, edit, issues, printings, form
   const legend = of("LEGEND");
   const runes = of("RUNES");
   const bfs = of("BATTLEFIELDS");
-  const main = [...of("CHAMPION"), ...of("MAIN")];
+  const champion = of("CHAMPION");
+  const main = of("MAIN");
   const side = of("SIDEBOARD");
   const key = (l: DeckLine) => `${l.section}|${l.cardId}`;
   const openLine = live.find((l) => key(l) === openKey) ?? null;
@@ -67,7 +68,6 @@ export function DeckGallery({ lines, cards, owned, edit, issues, printings, form
           onClick={() => setOpenKey(key(l))}
           className={cn(
             "group relative block w-full overflow-hidden rounded-[10px] bg-inset text-left ring-1 ring-rule transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_-10px_rgba(22,24,29,0.45)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-quill",
-            champion && "ring-2 ring-quill",
             problem && "ring-2 ring-loss",
             variant === "wide" ? "aspect-[1039/744]" : "aspect-[744/1039]",
           )}
@@ -85,7 +85,6 @@ export function DeckGallery({ lines, cards, owned, edit, issues, printings, form
               {[artName(pr?.art), pr?.finish === "FOIL" ? "Foil" : null].filter(Boolean).join(" · ")}
             </span>
           )}
-          {champion && <span className="absolute top-1.5 left-1.5 rounded-[4px] bg-quill px-1.5 py-0.5 text-[10px] font-semibold text-white">Champion</span>}
           <span className="num absolute right-1.5 bottom-1.5 rounded-[5px] border border-rule bg-sheet/95 px-1.5 py-0.5 text-[13px] font-semibold text-ink">×{l.quantity}</span>
           {short > 0 && (
             <span className="num absolute bottom-1.5 left-1.5 rounded-[5px] bg-caution-tint px-1.5 py-0.5 text-[11px] font-medium text-caution" title={`You're missing ${short}`}>
@@ -99,18 +98,24 @@ export function DeckGallery({ lines, cards, owned, edit, issues, printings, form
 
   return (
     <div className="space-y-7" data-testid="deck-gallery">
-      <div className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,2.2fr)]">
+      {/* Top row: Legend, then the Chosen Champion beside it, then the runes. */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] sm:gap-x-6">
         <Block title="Legend" n={count(legend)} target={GAME_RULES.legend.count}>
           <ul className="grid max-w-[220px] grid-cols-1">{legend.map((l) => tile(l))}</ul>
         </Block>
-        <Block title="Runes" n={count(runes)} target={GAME_RULES.runeDeck.size}>
-          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">{runes.map((l) => tile(l))}</ul>
+        <Block title="Champion" n={count(champion)} target={GAME_RULES.chosenChampion.count} label="Chosen Champion">
+          <ul className="grid max-w-[220px] grid-cols-1">{champion.map((l) => tile(l))}</ul>
         </Block>
+        <div className="col-span-2 sm:col-span-1">
+          <Block title="Runes" n={count(runes)} target={GAME_RULES.runeDeck.size}>
+            <ul className="grid grid-cols-3 gap-3 sm:grid-cols-3 xl:grid-cols-4">{runes.map((l) => tile(l))}</ul>
+          </Block>
+        </div>
       </div>
       <Block title="Battlefields" n={count(bfs)} target={GAME_RULES.battlefields.count}>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">{bfs.map((l) => tile(l, cards.get(l.cardId)?.orientation === "landscape" ? "wide" : "card"))}</ul>
       </Block>
-      <Block title="Main deck" n={count(main)} target={GAME_RULES.mainDeck.minSize}>
+      <Block title="Main deck" n={count(main) + count(champion)} target={GAME_RULES.mainDeck.minSize} note={champion.length ? "incl. Chosen Champion" : undefined}>
         <ul className="grid grid-cols-3 gap-3 sm:grid-cols-5 xl:grid-cols-6">{main.map((l) => tile(l))}</ul>
       </Block>
       {side.length > 0 && (
@@ -123,15 +128,16 @@ export function DeckGallery({ lines, cards, owned, edit, issues, printings, form
   );
 }
 
-function Block({ title, n, target, max, children }: { title: string; n: number; target: number; max?: boolean; children: React.ReactNode }) {
+function Block({ title, n, target, max, label, note, children }: { title: string; n: number; target: number; max?: boolean; label?: string; note?: string; children: React.ReactNode }) {
   const ok = max ? n <= target : n === target || (title === "Main deck" && n >= target);
   return (
-    <section aria-label={title}>
+    <section aria-label={label ?? title}>
       <h2 className="mb-2.5 flex items-baseline gap-2 text-[13px] font-semibold tracking-wide uppercase">
         {title}
         <span className={cn("num", n === 0 ? "text-ink-3" : ok ? "text-gain" : "text-loss")}>
           {n}/{target}
         </span>
+        {note && <span className="text-[11px] font-normal tracking-normal text-ink-3 normal-case">{note}</span>}
       </h2>
       {n === 0 ? <p className="rounded-[var(--radius-panel)] border border-dashed border-rule-strong px-4 py-6 text-center text-sm text-ink-3">Nothing here yet.</p> : children}
     </section>
