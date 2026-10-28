@@ -30,6 +30,8 @@ export async function loadDeckCards(db: PrismaClient, cardIds: string[]): Promis
         domains: pipeSplit(c.domains),
         tags: pipeSplit(c.tags),
         energy: c.energy,
+        power: c.power,
+        might: c.might,
         imageUrl: c.imageUrl,
         standardLegal: c.set.standardLegal,
         rotatesOn: c.set.rotatesOn ? dayKey(c.set.rotatesOn) : null,

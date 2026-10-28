@@ -13,6 +13,10 @@ test("marking a deck as owned adds exactly the missing copies, as one undoable o
   await page.getByRole("button", { name: "Import deck" }).click();
   await expect(page).toHaveURL(/\/decks\/(?!new$)[^/]+$/);
   const deckId = page.url().split("/decks/")[1];
+  // Stats panel: cards, curves and type split for the 40 cards you draw (champion + main)
+  await expect(page.getByTestId("stat-tiles")).toContainText("40");
+  await expect(page.getByTestId("energy-curve").getByRole("img")).toHaveAttribute("aria-label", /Energy curve: /);
+  await expect(page.getByTestId("card-types")).toContainText("Unit");
 
   // One proxied copy, to check proxies are left alone unless you say otherwise.
   const proxied = await db.deckCard.findFirstOrThrow({ where: { deckId, section: "MAIN" } });

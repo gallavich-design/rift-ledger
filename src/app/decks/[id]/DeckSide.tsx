@@ -1,8 +1,9 @@
 "use client";
 
+import { ImageExport } from "./ImageExport";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Copy, Download, ImageDown, Link2, Search } from "lucide-react";
+import { Copy, Download, Link2, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SelectField, TextField } from "@/components/ui/fields";
 import { cn } from "@/lib/ui";
@@ -243,8 +244,6 @@ export function ExportShare({ deckId, deckName, shareToken }: { deckId: string; 
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, start] = useTransition();
-  const [imaging, setImaging] = useState(false);
-  const [imageError, setImageError] = useState<string | null>(null);
   const shareUrl = token && typeof window !== "undefined" ? `${window.location.origin}/share/deck/${token}` : null;
 
   return (
@@ -260,42 +259,8 @@ export function ExportShare({ deckId, deckName, shareToken }: { deckId: string; 
             <Download size={14} aria-hidden /> CSV
           </a>
         </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={imaging}
-          data-testid="export-image"
-          onClick={async () => {
-            // Drawn on the server (card art from other sites can't be exported from a browser canvas).
-            setImaging(true);
-            setImageError(null);
-            try {
-              const res = await fetch(`/decks/${deckId}/image`);
-              if (!res.ok) throw new Error();
-              const url = URL.createObjectURL(await res.blob());
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `${deckName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") || "deck"}.png`;
-              a.click();
-              setTimeout(() => URL.revokeObjectURL(url), 1000);
-            } catch {
-              setImageError("Couldn't make the image — try again.");
-            } finally {
-              setImaging(false);
-            }
-          }}
-        >
-          <ImageDown size={14} aria-hidden /> {imaging ? "Making image…" : "Image"}
-        </Button>
-        <a href={`/decks/${deckId}/image`} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center px-1 text-[13px] text-quill hover:underline">
-          Preview
-        </a>
+        <ImageExport deckId={deckId} deckName={deckName} />
       </div>
-      {imageError && (
-        <p role="alert" className="text-xs text-loss">
-          {imageError}
-        </p>
-      )}
       <div>
         {token ? (
           <div className="space-y-2">

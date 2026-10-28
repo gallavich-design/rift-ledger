@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Check, ChevronDown, Minus, Plus, Search, X } from "lucide-react";
-import { Bar, BarChart, LabelList, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { validateDeck, type Issue } from "@/lib/decks/validate";
 import { costDeck, type CardPricing } from "@/lib/decks/cost";
 import { deckStats } from "@/lib/decks/stats";
@@ -12,13 +11,13 @@ import { diffSnapshots, formatDiff } from "@/lib/decks/diff";
 import { defaultSection, SECTION_LABEL, SECTIONS, type DeckLine, type Section } from "@/lib/decks/types";
 import type { EditorCard } from "@/lib/decks/data";
 import { GAME_RULES } from "@/config/gameRules";
-import { AXIS_TEXT, BAR_COLOR } from "@/config/chartColors";
 import { formatMoney } from "@/lib/money/money";
 import { Button } from "@/components/ui/Button";
 import { DomainStripe } from "@/components/cards/DomainStripe";
 import { cn } from "@/lib/ui";
 import { saveDeck } from "../actions";
 import { MarkOwned } from "./MarkOwned";
+import { DeckStatsPanel } from "./DeckStats";
 
 interface Props {
   deckId: string;
@@ -39,7 +38,7 @@ const TARGET: Partial<Record<Section, string>> = {
   CHAMPION: `${GAME_RULES.chosenChampion.count}`,
   RUNES: `${GAME_RULES.runeDeck.size}`,
   BATTLEFIELDS: `${GAME_RULES.battlefields.count}`,
-  SIDEBOARD: GAME_RULES.sideboard.allowedSizes.join(" or "),
+  SIDEBOARD: `up to ${GAME_RULES.sideboard.max}`,
 };
 
 const key = (l: Pick<DeckLine, "section" | "cardId">) => `${l.section}|${l.cardId}`;
@@ -437,25 +436,8 @@ export function DeckEditor(p: Props) {
             )}
           </Panel>
 
-          <Panel title="Curve & mix" testid="stats">
-            <div className="h-28" role="img" aria-label={`Energy curve: ${stats.curve.map((c) => `${c.count} at ${c.energy}`).join(", ")}`}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.curve} margin={{ top: 14, right: 0, bottom: 0, left: 0 }}>
-                  <XAxis dataKey="energy" tickLine={false} axisLine={false} tick={{ fill: AXIS_TEXT, fontSize: 11, fontFamily: "var(--font-plex-mono)" }} />
-                  <Tooltip cursor={{ fill: "rgba(22,24,29,0.04)" }} formatter={(v) => [`${v} cards`, "Count"]} labelFormatter={(l) => `${l} energy`} />
-                  <Bar dataKey="count" fill={BAR_COLOR} radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={false}>
-                    <LabelList dataKey="count" position="top" style={{ fill: AXIS_TEXT, fontSize: 10, fontFamily: "var(--font-plex-mono)" }} formatter={(v: unknown) => (Number(v) ? String(v) : "")} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="mt-1 text-xs text-ink-3">
-              Energy curve · average <span className="num">{stats.averageEnergy?.toFixed(2) ?? "—"}</span> over <span className="num">{stats.playables}</span> cards
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-4">
-              <Split title="Types" rows={stats.types} total={stats.playables} />
-              <Split title="Domains" rows={stats.domains} total={stats.playables} />
-            </div>
+          <Panel title="Stats" testid="stats">
+            <DeckStatsPanel stats={stats} />
           </Panel>
         </aside>
       </div>
@@ -512,27 +494,6 @@ function Fact({ label, value, hint, strong, testid }: { label: string; value: st
         {value}
       </dd>
       {hint && <dd className="text-[11px] text-ink-3">{hint}</dd>}
-    </div>
-  );
-}
-
-function Split({ title, rows, total }: { title: string; rows: { key: string; count: number }[]; total: number }) {
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-medium text-ink-2">{title}</p>
-      <ul className="space-y-1">
-        {rows.map((r) => (
-          <li key={r.key} className="text-xs">
-            <div className="flex justify-between">
-              <span>{r.key}</span>
-              <span className="num text-ink-3">{r.count}</span>
-            </div>
-            <div className="mt-0.5 h-1 rounded-full bg-inset">
-              <div className="h-1 rounded-full bg-quill" style={{ width: `${total ? (r.count / total) * 100 : 0}%` }} />
-            </div>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

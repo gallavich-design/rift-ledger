@@ -52,7 +52,7 @@
   standalone image is possible.
 
 ## Verify before relying on them (`TODO verify`)
-- `src/config/gameRules.ts` — sourced from Core Rules §103 on 2026-10-26; only the sideboard size (0 or 8) is still `TODO verify`.
+- `src/config/gameRules.ts` — sourced from Core Rules §103 on 2026-10-26; only the sideboard size (now up to 10, per your update of 2026-10-28 — confirm whether it must be exactly 10) is still `TODO verify`.
 - `src/config/rotation.ts` — rotation dates and which set codes count as Sets 1–5 (Radiance has none yet).
 - `src/config/domains.ts` — domain hues vs official iconography.
 

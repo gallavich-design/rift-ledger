@@ -128,12 +128,17 @@ test("decks list, share link and text export work", async ({ page }) => {
   await expect(shared.locator("main")).not.toContainText("฿");
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Text" }).click()]);
   expect(download.suggestedFilename()).toBe("E2E-Test-Deck.txt");
-  // Image: the card-grid PNG, made on the server
-  const [png] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), page.getByTestId("export-image").click()]);
+  // Image: an A4 card-grid PNG, made on the server, with layout and background options
+  await page.getByTestId("export-image").click();
+  const panel = page.getByTestId("image-panel");
+  await panel.getByText("By card type").click();
+  await panel.getByRole("button", { name: "Navy" }).click();
+  await expect(panel.getByRole("img", { name: /Preview of/ })).toHaveAttribute("src", /group=type&bg=%230f1a2e/);
+  const [png] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), page.getByTestId("image-download").click()]);
   expect(png.suggestedFilename()).toBe("E2E-Test-Deck.png");
   const bytes = await (await import("node:fs/promises")).readFile((await png.path())!);
   expect(bytes.subarray(1, 4).toString()).toBe("PNG");
-  expect(bytes.readUInt32BE(16)).toBe(1080); // width from the IHDR chunk
+  expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([1240, 1754]); // A4 at 150 dpi
 });
 
 test.describe("phone width", () => {

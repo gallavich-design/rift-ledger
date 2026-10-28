@@ -40,8 +40,12 @@ export const GAME_RULES = {
    */
   battlefields: { count: 3, unique: true },
 
-  /** [DB] Sideboard is exactly 8 or 0 cards (no sideboarding in best-of-one). TODO verify against tournament rules. */
-  sideboard: { allowedSizes: [0, 8] as number[] },
+  /**
+   * Sideboard: up to 10 cards (0 = no sideboard). Updated 2026-10-28 from the project owner's report that
+   * the limit changed from 8 to 10 (previously [DB]: exactly 0 or 8). TODO verify against the current
+   * tournament rules — including whether a sideboard must be exactly 10 rather than "up to".
+   */
+  sideboard: { min: 0, max: 10 },
 
   /**
    * [CR 103.2.b] Domain identity comes from the Legend's domains. A multi-domain card needs all its

@@ -1,5 +1,23 @@
 # Changelog
 
+## Deck image options, sideboard 10, new stats panel (2026-10-28)
+
+No schema changes.
+
+- Deck image is always an **A4 page** (portrait, 1240 × 1754 px = 150 dpi); cards shrink to fit.
+- Image **layout**: deck order, or **by card type** (Units / Gear / Spells, each with its copies;
+  Legend, runes, battlefields and champion stay on top; sideboard last).
+- Image **background**: six presets (Paper, White, Sand, Slate, Navy, Black) or any custom colour;
+  text switches to light on dark backgrounds. Live preview in the export panel; the last choice is
+  remembered on this device.
+- **Sideboard** limit is now up to 10 cards (was exactly 0 or 8) — `gameRules.ts`, per the owner's
+  update; still `TODO verify` whether it must be exactly 10.
+- Deck **Stats** panel (layout inspired by Piltover Archive): Cards / Avg energy / Avg power tiles,
+  energy and power curves with counts and hover details, a card-type bar (Unit / Spell / Gear) and
+  domain counts. Curves use one colour rather than domain stacks, because several domain colour
+  pairs can't be told apart by colour-blind readers.
+
+
 ## Deck image as a card grid (2026-10-28)
 
 No schema changes.

@@ -19,6 +19,8 @@ export interface DeckCardInfo {
   domains: string[];
   tags: string[];
   energy: number | null;
+  power?: number | null;
+  might?: number | null;
   imageUrl?: string | null;
   standardLegal: boolean; // card's set is a Standard product
   rotatesOn: string | null; // YYYY-MM-DD, from the card's set

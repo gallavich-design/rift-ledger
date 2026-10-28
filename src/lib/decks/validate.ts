@@ -136,8 +136,8 @@ export function validateDeck(lines: DeckLine[], info: Map<string, DeckCardInfo>,
   }
 
   // ── Sideboard ──
-  if (!R.sideboard.allowedSizes.includes(counts.SIDEBOARD))
-    issues.push({ rule: "SIDEBOARD", message: `Sideboard has ${plural(counts.SIDEBOARD, "card")} — it must be ${R.sideboard.allowedSizes.join(" or ")}.` });
+  if (counts.SIDEBOARD < R.sideboard.min || counts.SIDEBOARD > R.sideboard.max)
+    issues.push({ rule: "SIDEBOARD", message: `Sideboard has ${plural(counts.SIDEBOARD, "card")} — the limit is ${R.sideboard.max}.` });
 
   // ── Right card type in each section ──
   for (const l of active) {

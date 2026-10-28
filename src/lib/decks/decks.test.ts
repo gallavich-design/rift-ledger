@@ -22,6 +22,7 @@ add({ cardId: "champ", name: "Card Hero - Champion", type: "Unit", supertype: "C
 add({ cardId: "otherChamp", name: "Card Villain - Champion", type: "Unit", supertype: "Champion", domains: ["Fury"], tags: ["Card Villain"] });
 for (let i = 1; i <= 13; i++) add({ cardId: `m${i}`, name: `Card M${i}`, type: i % 4 === 0 ? "Spell" : "Unit", domains: [i % 2 ? "Fury" : "Order"], energy: i % 8 });
 add({ cardId: "colorless", name: "Card Colorless Gear", type: "Gear", domains: ["Colorless"] });
+add({ cardId: "colorless2", name: "Card Colorless Spell", type: "Spell", domains: ["Colorless"] });
 add({ cardId: "mind", name: "Card Mind Spell", type: "Spell", domains: ["Mind"] });
 add({ cardId: "furyMind", name: "Card Fury-Mind Unit", type: "Unit", domains: ["Fury", "Mind"] });
 add({ cardId: "sig", name: "Card Hero Signature", type: "Spell", supertype: "Signature", domains: ["Fury", "Order"], tags: ["Card Hero"] });
@@ -76,7 +77,7 @@ describe("legality validator (driven by gameRules.ts)", () => {
     { rule: "RUNES", name: "off-identity rune", breakIt: (l) => set(set(l, "runeF", "RUNES", 5), "runeM", "RUNES", 1), message: /Mind Rune is outside your Legend's domains \(Fury and Order\)/ },
     { rule: "BATTLEFIELDS", name: "two battlefields", breakIt: (l) => l.filter((x) => x.cardId !== "bf3"), message: /2 battlefields — you need exactly 3/ },
     { rule: "BATTLEFIELDS", name: "duplicate battlefield", breakIt: (l) => set(l.filter((x) => x.cardId !== "bf3"), "bf2", "BATTLEFIELDS", 2), message: /2 copies of Card Battlefield 2 — each battlefield must be different/ },
-    { rule: "SIDEBOARD", name: "five-card sideboard", breakIt: (l) => l.concat(["m1", "m2", "m3", "m4", "m5"].map((cardId) => ({ cardId: cardId === "m1" ? "colorless" : cardId, section: "SIDEBOARD" as const, quantity: 1, proxyQuantity: 0 }))), message: /Sideboard has 5 cards — it must be 0 or 8/ },
+    { rule: "SIDEBOARD", name: "eleven-card sideboard", breakIt: (l) => l.concat(["m1", "m2", "m3", "m4", "m5", "m6", "m7", "colorless"].map((cardId) => ({ cardId, section: "SIDEBOARD" as const, quantity: 1, proxyQuantity: 0 })), [{ cardId: "colorless2", section: "SIDEBOARD" as const, quantity: 3, proxyQuantity: 0 }]), message: /Sideboard has 11 cards — the limit is 10/ },
     { rule: "DOMAIN_IDENTITY", name: "mind card in a fury/order deck", breakIt: (l) => set(set(l, "m1", "MAIN", 2), "mind", "MAIN", 1), message: /Card Mind Spell \(Mind\) is outside your Legend's domains \(Fury and Order\)/ },
     { rule: "DOMAIN_IDENTITY", name: "multi-domain card needs every domain", breakIt: (l) => set(set(l, "m1", "MAIN", 2), "furyMind", "MAIN", 1), message: /Card Fury-Mind Unit \(Fury and Mind\) is outside/ },
     { rule: "SECTION", name: "rune in the main deck", breakIt: (l) => set(set(l, "m1", "MAIN", 2), "runeF", "MAIN", 1), message: /Fury Rune is a Rune — it belongs in the rune deck, not the main deck/ },
@@ -99,6 +100,13 @@ describe("legality validator (driven by gameRules.ts)", () => {
 
   it("colorless cards fit any identity", () => {
     expect(rulesOf(set(set(legalDeck(), "m1", "MAIN", 2), "colorless", "MAIN", 1)).size).toBe(0);
+  });
+
+  it("sideboards of 0 to 10 cards are legal", () => {
+    for (const n of [5, 10]) {
+      const l = legalDeck().concat([{ cardId: "colorless2", section: "SIDEBOARD" as const, quantity: Math.min(3, n), proxyQuantity: 0 }], ["m1", "m2", "m3", "m4", "m5", "m6", "m7"].slice(0, n - Math.min(3, n)).map((cardId) => ({ cardId, section: "SIDEBOARD" as const, quantity: 1, proxyQuantity: 0 })));
+      expect(check(l).issues.filter((i) => i.rule === "SIDEBOARD")).toEqual([]);
+    }
   });
 
   it("an 8-card sideboard is legal and counts toward the copy limit", () => {
@@ -246,6 +254,14 @@ describe("deck stats", () => {
     expect(s.curve.find((x) => x.energy === "4")!.count).toBe(1 + 3 + 3); // champion + m4 + m12
     expect(s.types.map((t) => t.key)).toEqual(["Unit", "Spell"]);
     expect(s.averageEnergy).toBeGreaterThan(0);
+  });
+
+  it("stacks each curve bar by domain and averages power", () => {
+    const s = deckStats(legalDeck(), info);
+    for (const b of [...s.energyCurve, ...s.powerCurve]) expect(b.byDomain.reduce((a, d) => a + d.count, 0)).toBe(b.count);
+    expect(s.energyCurve.map((b) => b.value)).toEqual(Array.from({ length: s.energyCurve.length }, (_, i) => i));
+    expect(s.powerCurve.reduce((a, b) => a + b.count, 0)).toBe(40); // no power cost counts as 0
+    expect(s.averagePower).toBe(0);
   });
 });
 
