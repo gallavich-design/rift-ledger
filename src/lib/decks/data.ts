@@ -78,6 +78,10 @@ export async function loadDeckPricing(
       variantId: v.id,
       label: `${v.set.code}·${String(v.collectorNumber ?? "").padStart(3, "0")} ${ART_LABEL[v.art as VariantArt] ?? v.art} ${v.finish === "FOIL" ? "Foil" : "Normal"}${v.gradingCompany ? ` ${v.gradingCompany} ${v.grade ?? ""}` : ""}`.trim(),
       unit,
+      imageUrl: v.imageUrl ?? v.card.imageUrl,
+      art: v.art,
+      finish: v.finish,
+      number: `${v.set.code}-${String(v.collectorNumber ?? "").padStart(3, "0")}`,
     });
     out.set(v.cardId, entry);
   }
@@ -87,6 +91,19 @@ export async function loadDeckPricing(
     const base = vs.filter((v) => v.imageUrl === v.card.imageUrl && v.art === "STANDARD");
     const pick = base.find((v) => v.finish === "NORMAL") ?? base[0] ?? vs.find((v) => v.art === "STANDARD") ?? vs[0];
     entry.defaultVariantId = pick?.id ?? null;
+  }
+  return out;
+}
+
+/** The art (and card number) of specific printings, without prices — for read-only views. */
+export async function loadPrintingArt(db: PrismaClient, variantIds: string[]): Promise<Map<string, { variantId: string; label: string; unit: null; imageUrl: string | null; art: string; finish: string; number: string }[]>> {
+  const out = new Map<string, { variantId: string; label: string; unit: null; imageUrl: string | null; art: string; finish: string; number: string }[]>();
+  if (!variantIds.length) return out;
+  const vs = await db.cardVariant.findMany({ where: { id: { in: variantIds } }, include: { set: { select: { code: true } }, card: { select: { imageUrl: true } } } });
+  for (const v of vs) {
+    const number = `${v.set.code}-${String(v.collectorNumber ?? "").padStart(3, "0")}`;
+    const entry = { variantId: v.id, label: `${number} ${ART_LABEL[v.art as VariantArt] ?? v.art}`, unit: null, imageUrl: v.imageUrl ?? v.card.imageUrl, art: v.art, finish: v.finish, number };
+    out.set(v.cardId, [...(out.get(v.cardId) ?? []), entry]);
   }
   return out;
 }

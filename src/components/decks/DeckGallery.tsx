@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ExternalLink, Minus, Plus, X } from "lucide-react";
 import type { EditorCard } from "@/lib/decks/data";
 import type { DeckLine, Section } from "@/lib/decks/types";
+import type { VariantPrice } from "@/lib/decks/cost";
+import { ART_LABEL, type VariantArt } from "@/lib/domain/enums";
 import { GAME_RULES } from "@/config/gameRules";
 import { domainColor } from "@/config/domains";
 import { RulesText } from "@/components/cards/RulesText";
@@ -16,12 +18,26 @@ import { cn } from "@/lib/ui";
 export interface GalleryEdit {
   inc: (l: DeckLine) => void;
   dec: (l: DeckLine) => void;
+  /** Pick the printing (art/finish) for this line; null = the default printing. */
+  printing?: (l: DeckLine, variantId: string | null) => void;
+}
+
+/** Printings of each card (from the deck pricing), optionally with the one used when none is chosen. */
+export type GalleryPrintings = Map<string, { defaultVariantId?: string | null; variants: VariantPrice[] }>;
+
+const artName = (a?: string) => (a ? (ART_LABEL[a as VariantArt] ?? a) : "Standard");
+
+/** The printing a line shows: the chosen one, else the card's default. */
+export function chosenPrinting(l: DeckLine, printings?: GalleryPrintings): VariantPrice | null {
+  const p = printings?.get(l.cardId);
+  if (!p) return null;
+  return p.variants.find((v) => v.variantId === l.preferredVariantId) ?? p.variants.find((v) => v.variantId === p.defaultVariantId) ?? null;
 }
 
 const byCost = (cards: Map<string, EditorCard>) => (a: DeckLine, b: DeckLine) =>
   (cards.get(a.cardId)?.energy ?? 99) - (cards.get(b.cardId)?.energy ?? 99) || (cards.get(a.cardId)?.name ?? "").localeCompare(cards.get(b.cardId)?.name ?? "");
 
-export function DeckGallery({ lines, cards, owned, edit, issues, cardLinks = true }: { lines: DeckLine[]; cards: Map<string, EditorCard>; owned?: Map<string, number>; edit?: GalleryEdit; issues?: Map<string, string>; cardLinks?: boolean }) {
+export function DeckGallery({ lines, cards, owned, edit, issues, printings, formatPrice, cardLinks = true }: { lines: DeckLine[]; cards: Map<string, EditorCard>; owned?: Map<string, number>; edit?: GalleryEdit; issues?: Map<string, string>; printings?: GalleryPrintings; formatPrice?: (n: number) => string; cardLinks?: boolean }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const live = lines.filter((l) => l.quantity > 0 && cards.has(l.cardId));
   const of = (s: Section) => live.filter((l) => l.section === s).sort(byCost(cards));
@@ -39,6 +55,11 @@ export function DeckGallery({ lines, cards, owned, edit, issues, cardLinks = tru
     const champion = l.section === "CHAMPION";
     const problem = issues?.get(l.cardId);
     const short = owned ? Math.max(0, l.quantity - (owned.get(l.cardId) ?? 0)) : 0;
+    const pr = chosenPrinting(l, printings);
+    const img = pr?.imageUrl ?? c.imageUrl;
+    const special = pr?.art && pr.art !== "STANDARD";
+    // Badge only a printing you picked (not the default), so it marks your choices.
+    const picked = !!pr && !!l.preferredVariantId && l.preferredVariantId !== printings?.get(l.cardId)?.defaultVariantId;
     return (
       <li key={key(l)} className="min-w-0">
         <button
@@ -50,14 +71,19 @@ export function DeckGallery({ lines, cards, owned, edit, issues, cardLinks = tru
             problem && "ring-2 ring-loss",
             variant === "wide" ? "aspect-[1039/744]" : "aspect-[744/1039]",
           )}
-          aria-label={`${c.name}, ${l.quantity} ${l.quantity === 1 ? "copy" : "copies"}${champion ? ", Chosen Champion" : ""} — show details`}
+          aria-label={`${c.name}, ${l.quantity} ${l.quantity === 1 ? "copy" : "copies"}${champion ? ", Chosen Champion" : ""}${special ? `, ${artName(pr?.art)}` : ""} — show details`}
           data-testid="gallery-card"
         >
-          {c.imageUrl ? (
+          {img ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={c.imageUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={img} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <span className="absolute inset-0 grid place-items-center p-2 text-center text-xs text-ink-2">{c.name}</span>
+          )}
+          {picked && (
+            <span className="absolute top-1.5 right-1.5 rounded-[4px] bg-ink/85 px-1.5 py-0.5 text-[10px] font-semibold text-white" data-testid="printing-badge">
+              {[artName(pr?.art), pr?.finish === "FOIL" ? "Foil" : null].filter(Boolean).join(" · ")}
+            </span>
           )}
           {champion && <span className="absolute top-1.5 left-1.5 rounded-[4px] bg-quill px-1.5 py-0.5 text-[10px] font-semibold text-white">Champion</span>}
           <span className="num absolute right-1.5 bottom-1.5 rounded-[5px] border border-rule bg-sheet/95 px-1.5 py-0.5 text-[13px] font-semibold text-ink">×{l.quantity}</span>
@@ -92,7 +118,7 @@ export function DeckGallery({ lines, cards, owned, edit, issues, cardLinks = tru
           <ul className="grid grid-cols-3 gap-3 sm:grid-cols-5 xl:grid-cols-6">{side.map((l) => tile(l))}</ul>
         </Block>
       )}
-      {openLine && <CardDialog line={openLine} card={cards.get(openLine.cardId)!} owned={owned?.get(openLine.cardId)} edit={edit} issue={issues?.get(openLine.cardId)} cardLinks={cardLinks} onClose={() => setOpenKey(null)} />}
+      {openLine && <CardDialog line={openLine} card={cards.get(openLine.cardId)!} owned={owned?.get(openLine.cardId)} edit={edit} issue={issues?.get(openLine.cardId)} cardLinks={cardLinks} printings={printings} formatPrice={formatPrice} onClose={() => setOpenKey(null)} />}
     </div>
   );
 }
@@ -114,7 +140,7 @@ function Block({ title, n, target, max, children }: { title: string; n: number; 
 
 const SECTION_NAME: Record<Section, string> = { LEGEND: "Legend", CHAMPION: "Chosen Champion", MAIN: "Main deck", RUNES: "Runes", BATTLEFIELDS: "Battlefields", SIDEBOARD: "Sideboard" };
 
-function CardDialog({ line, card: c, owned, edit, issue, cardLinks, onClose }: { line: DeckLine; card: EditorCard; owned?: number; edit?: GalleryEdit; issue?: string; cardLinks: boolean; onClose: () => void }) {
+function CardDialog({ line, card: c, owned, edit, issue, cardLinks, printings, formatPrice, onClose }: { line: DeckLine; card: EditorCard; owned?: number; edit?: GalleryEdit; issue?: string; cardLinks: boolean; printings?: GalleryPrintings; formatPrice?: (n: number) => string; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current;
@@ -127,7 +153,19 @@ function CardDialog({ line, card: c, owned, edit, issue, cardLinks, onClose }: {
     { label: "Power", value: c.power ?? 0, show: playable },
     { label: "Might", value: c.might, show: c.type === "Unit" || c.might != null },
   ].filter((s) => s.show);
-  const number = `${c.setCode}-${String(c.collectorNumber ?? "").padStart(3, "0")}`;
+  const pr = chosenPrinting(line, printings);
+  const img = pr?.imageUrl ?? c.imageUrl;
+  const number = pr?.number ?? `${c.setCode}-${String(c.collectorNumber ?? "").padStart(3, "0")}`;
+  const all = printings?.get(c.cardId)?.variants ?? [];
+  const defaultId = printings?.get(c.cardId)?.defaultVariantId ?? null;
+  const canPick = !!edit?.printing && all.length > 1;
+  // One thumbnail per distinct picture; picking one keeps the current finish where that art has it.
+  const arts = [...new Map(all.map((v) => [v.imageUrl ?? v.variantId, v])).values()];
+  const pick = (id: string | null) => edit?.printing?.(line, id === defaultId ? null : id);
+  const pickArt = (v: VariantPrice) => {
+    const same = all.filter((x) => (x.imageUrl ?? x.variantId) === (v.imageUrl ?? v.variantId));
+    pick((same.find((x) => x.finish === (pr?.finish ?? "NORMAL")) ?? same.find((x) => x.finish === "NORMAL") ?? same[0]).variantId);
+  };
 
   return (
     <dialog
@@ -146,7 +184,7 @@ function CardDialog({ line, card: c, owned, edit, issue, cardLinks, onClose }: {
         </button>
         <div className={cn("relative mx-auto mt-9 w-full max-w-[300px] overflow-hidden sm:mt-0 rounded-[12px] bg-inset ring-1 ring-rule", c.orientation === "landscape" ? "aspect-[1039/744]" : "aspect-[744/1039]")}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {c.imageUrl && <img src={c.imageUrl} alt={c.name} className="absolute inset-0 h-full w-full object-cover" />}
+          {img && <img src={img} alt={`${c.name}${pr?.art && pr.art !== "STANDARD" ? ` (${artName(pr.art)})` : ""}`} className="absolute inset-0 h-full w-full object-cover" />}
         </div>
         <div className="min-w-0 space-y-4">
           <div className="pr-10">
@@ -186,7 +224,62 @@ function CardDialog({ line, card: c, owned, edit, issue, cardLinks, onClose }: {
             <p className="text-ink-2">
               Card number: <span className="num text-ink">{number}</span>
             </p>
+            {pr && (
+              <p className="text-ink-2">
+                Printing:{" "}
+                <span className="text-ink">
+                  {artName(pr.art)}
+                  {pr.finish === "FOIL" ? " · Foil" : ""}
+                </span>
+              </p>
+            )}
           </section>
+          {canPick && (
+            <section data-testid="printing-picker">
+              <h3 className="mb-2 text-sm font-semibold">Printing</h3>
+              {arts.length > 1 && (
+                <ul className="mb-2.5 flex flex-wrap gap-2" aria-label="Art">
+                  {arts.map((v) => {
+                    const on = (pr?.imageUrl ?? pr?.variantId) === (v.imageUrl ?? v.variantId);
+                    return (
+                      <li key={v.variantId}>
+                        <button
+                          type="button"
+                          onClick={() => pickArt(v)}
+                          aria-pressed={on}
+                          aria-label={`${artName(v.art)} ${v.number ?? ""}`.trim()}
+                          title={`${artName(v.art)} · ${v.number ?? ""}`}
+                          className={cn("relative block w-[54px] overflow-hidden rounded-[6px] bg-inset ring-1 ring-rule", c.orientation === "landscape" ? "aspect-[1039/744] w-[76px]" : "aspect-[744/1039]", on && "ring-2 ring-quill")}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          {v.imageUrl && <img src={v.imageUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
+                          {on && <span className="absolute inset-x-0 bottom-0 bg-quill py-px text-center text-[9px] font-semibold text-white">In deck</span>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <label className="block">
+                <span className="sr-only">Printing for {c.name}</span>
+                <select
+                  value={pr?.variantId ?? ""}
+                  onChange={(e) => pick(e.target.value || null)}
+                  className="h-9 w-full rounded-[var(--radius-control)] border border-rule bg-sheet px-2 text-sm focus:border-quill focus:outline-none"
+                  data-testid="printing-select"
+                >
+                  {all.map((v) => (
+                    <option key={v.variantId} value={v.variantId}>
+                      {v.label}
+                      {v.variantId === defaultId ? " (default)" : ""}
+                      {formatPrice ? ` — ${v.unit != null ? formatPrice(v.unit) : "no price"}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="mt-1.5 text-xs text-ink-3">The deck shows this art, prices this printing and uses it in the image export.</p>
+            </section>
+          )}
           {issue && <p className="rounded-[var(--radius-control)] bg-loss-tint px-3 py-2 text-sm text-loss">{issue}</p>}
           <div className="flex flex-wrap items-center gap-3 border-t border-rule pt-3">
             <span className="text-sm text-ink-2">

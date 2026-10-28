@@ -22,7 +22,7 @@ export const metadata = { title: "Decks" };
 
 export default async function DecksPage() {
   const userId = await getCurrentUserId();
-  const decks = await db.deck.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, include: { cards: true, matches: { select: { opponentLegend: true, result: true } } } });
+  const decks = await db.deck.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, include: { cards: { include: { preferredVariant: { select: { imageUrl: true } } } }, matches: { select: { opponentLegend: true, result: true } } } });
   const settings = await getSettings(db, userId);
   const fx = await getFx(db, settings.fxOverrides);
   const display = settings.displayCurrency;
@@ -64,7 +64,7 @@ export default async function DecksPage() {
               <li key={d.id}>
                 <Link href={`/decks/${d.id}`} className="flex gap-4 rounded-[var(--radius-panel)] border border-rule bg-sheet p-4 hover:border-rule-strong" data-testid="deck-card">
                   <span className="relative w-16 shrink-0">
-                    <CardArt src={lc?.imageUrl ?? null} alt="" className="rounded-[6px]" />
+                    <CardArt src={(legend ? d.cards.find((c) => c.section === "LEGEND" && c.cardId === legend.cardId)?.preferredVariant?.imageUrl : null) ?? lc?.imageUrl ?? null} alt="" className="rounded-[6px]" />
                     {lc && <DomainStripe domains={lc.domains} className="absolute inset-x-1.5 top-0 h-[3px]" />}
                   </span>
                   <span className="min-w-0 flex-1">

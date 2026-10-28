@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-28 — Pick a card's printing from the deck view
+
+No schema changes (uses the existing per-line preferred printing).
+
+- The card pop-up has a **Printing** section when a card has more than one: a thumbnail for each art (standard, alternate, overnumbered, signature…) plus a list of every printing with its price.
+- Picking one swaps the art right away: the deck pictures, the pop-up, list thumbnails, the decks list (for the Legend), shared links and the image export all show the printing you chose. Its card number, price and cost to complete follow it. Save the deck to keep it.
+- Cards you've set to a non-default printing get a small label (e.g. "Overnumbered · Foil").
+
 ## 2026-10-28 — Deck page shows card pictures
 
 - Decks now open in a **Cards** view like Piltover Archive: Legend and Runes on top, then Battlefields, Main deck (Chosen Champion first) and Sideboard, each with a count against its target (12/12, 3/3, 40/40, 10/10) and a ×N badge on every card.

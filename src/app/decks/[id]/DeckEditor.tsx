@@ -18,7 +18,7 @@ import { cn } from "@/lib/ui";
 import { saveDeck } from "../actions";
 import { MarkOwned } from "./MarkOwned";
 import { DeckStatsPanel } from "./DeckStats";
-import { DeckGallery } from "@/components/decks/DeckGallery";
+import { chosenPrinting, DeckGallery } from "@/components/decks/DeckGallery";
 
 interface Props {
   deckId: string;
@@ -171,6 +171,7 @@ export function DeckEditor(p: Props) {
     () => ({
       inc: (l: DeckLine) => update(key(l), { quantity: l.quantity + 1 }),
       dec: (l: DeckLine) => update(key(l), { quantity: l.quantity - 1, proxyQuantity: Math.min(l.proxyQuantity, l.quantity - 1) }),
+      printing: (l: DeckLine, variantId: string | null) => update(key(l), { preferredVariantId: variantId }),
     }),
     [update],
   );
@@ -262,7 +263,7 @@ export function DeckEditor(p: Props) {
               ))}
             </div>
           </div>
-          {view === "cards" && <DeckGallery lines={lines} cards={cards} owned={owned} edit={galleryEdit} issues={galleryIssues} />}
+          {view === "cards" && <DeckGallery lines={lines} cards={cards} owned={owned} edit={galleryEdit} issues={galleryIssues} printings={pricing} formatPrice={fmt} />}
           {view === "list" && SECTIONS.map((s) => {
             const ls = sectionLines(s);
             const count = validation.counts[s] + (s === "MAIN" ? validation.counts.CHAMPION : 0);
@@ -299,7 +300,7 @@ export function DeckEditor(p: Props) {
                           <div className="flex items-center gap-3 px-3 py-2">
                             <span className="relative h-10 w-[29px] shrink-0 overflow-hidden rounded-[3px] bg-inset">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              {c.imageUrl && <img src={c.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />}
+                              {(chosenPrinting(l, pricing)?.imageUrl ?? c.imageUrl) && <img src={chosenPrinting(l, pricing)?.imageUrl ?? c.imageUrl ?? ""} alt="" className="h-full w-full object-cover" loading="lazy" />}
                               <DomainStripe domains={c.domains} className="absolute inset-x-0 top-0 h-[2px]" />
                             </span>
                             <span className="w-5 shrink-0 text-center">

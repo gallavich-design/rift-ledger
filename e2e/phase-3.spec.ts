@@ -79,6 +79,20 @@ test("the deck shows as card pictures; clicking one opens its details", async ({
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(page.getByTestId("legal-badge")).toHaveText("Legal");
+  // choosing another printing swaps the art on the deck (the test Legend has standard, overnumbered and signature art)
+  const legendTile = gallery.getByRole("region", { name: "Legend" }).getByTestId("gallery-card");
+  const before = await legendTile.locator("img").getAttribute("src");
+  await legendTile.click();
+  const picker = page.getByTestId("card-dialog").getByTestId("printing-picker");
+  await picker.getByRole("button", { name: /^Overnumbered/ }).click();
+  await expect(picker.getByRole("button", { name: /^Overnumbered/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("card-dialog")).toContainText("Printing: Overnumbered");
+  await page.keyboard.press("Escape");
+  await expect(legendTile.getByTestId("printing-badge")).toContainText("Overnumbered");
+  expect(await legendTile.locator("img").getAttribute("src")).not.toBe(before);
+  await expect(page.getByTestId("unsaved")).toBeVisible();
+  await page.getByRole("button", { name: "Discard" }).click();
+  await expect(legendTile.getByTestId("printing-badge")).toHaveCount(0);
   // switching to the list shows rows
   await page.getByRole("button", { name: "List" }).click();
   await expect(row(page, "MAIN", card)).toBeVisible();

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { dayKey } from "@/config/app";
-import { deckLinesFromRows, loadBannedNames, loadDeckCards } from "@/lib/decks/data";
+import { deckLinesFromRows, loadBannedNames, loadDeckCards, loadPrintingArt } from "@/lib/decks/data";
 import { validateDeck } from "@/lib/decks/validate";
 import { deckStats } from "@/lib/decks/stats";
 import { CardArt } from "@/components/cards/bits";
@@ -18,6 +18,8 @@ export default async function SharedDeckPage({ params }: { params: Promise<{ tok
   if (!deck) notFound();
   const lines = deckLinesFromRows(deck.cards);
   const cards = await loadDeckCards(db, [...new Set(lines.map((l) => l.cardId))]);
+  // Chosen printings only (their art); no prices on a shared page.
+  const printings = await loadPrintingArt(db, lines.flatMap((l) => (l.preferredVariantId ? [l.preferredVariantId] : [])));
   const v = validateDeck(lines, cards, { today: dayKey(), bannedNames: await loadBannedNames(db) });
   const stats = deckStats(lines, cards);
   const legend = lines.find((l) => l.section === "LEGEND");
@@ -27,7 +29,7 @@ export default async function SharedDeckPage({ params }: { params: Promise<{ tok
       <div className="mb-6 flex flex-wrap items-end gap-4">
         {lc && (
           <span className="relative w-20 shrink-0">
-            <CardArt src={lc.imageUrl ?? null} alt={lc.name} className="rounded-[6px]" />
+            <CardArt src={printings.get(lc.cardId)?.find((x) => x.variantId === legend?.preferredVariantId)?.imageUrl ?? lc.imageUrl ?? null} alt={lc.name} className="rounded-[6px]" />
             <DomainStripe domains={lc.domains} className="absolute inset-x-2 top-0 h-[3px]" />
           </span>
         )}
@@ -43,7 +45,7 @@ export default async function SharedDeckPage({ params }: { params: Promise<{ tok
           Download list
         </a>
       </div>
-      <DeckGallery lines={lines} cards={cards} cardLinks={false} />
+      <DeckGallery lines={lines} cards={cards} printings={new Map([...printings].map(([id, variants]) => [id, { variants }]))} cardLinks={false} />
     </div>
   );
 }

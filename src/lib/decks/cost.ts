@@ -7,6 +7,11 @@ export interface VariantPrice {
   variantId: string;
   label: string;
   unit: number | null; // display currency minor units, NM
+  // What the printing looks like, for the deck's card pictures (optional: cost maths doesn't need it).
+  imageUrl?: string | null;
+  art?: string; // STANDARD | ALTERNATE | OVERNUMBERED | SIGNATURE | PROMO | METAL
+  finish?: string; // NORMAL | FOIL
+  number?: string; // e.g. OGN-299
 }
 
 export interface CardPricing {
