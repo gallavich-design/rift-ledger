@@ -21,6 +21,9 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/ui";
 import { Disclosure, LocalPriceForm, ManualPriceForm, MoveLotSelect } from "./PriceForms";
 import { AddToDeck } from "./AddToDeck";
+import { QuickAdd } from "./QuickAdd";
+import { suggestBinder } from "@/lib/collection/binderChoice";
+import { quoteVariants } from "@/lib/prices/quote";
 import { WatchForm } from "./WatchForm";
 import { ErrataDiff } from "@/components/cards/ErrataDiff";
 import { RULING_LABEL, type RulingType } from "@/lib/rulings/service";
@@ -66,7 +69,7 @@ export default async function CardPage({ params, searchParams }: { params: Promi
     db.localPriceReport.findMany({ where: { userId, variantId: { in: variantIds } }, orderBy: [{ seenOn: "asc" }, { createdAt: "asc" }] }),
     db.manualPrice.findMany({ where: { userId, variantId: { in: variantIds } } }),
     db.lot.findMany({ where: { userId, variantId: { in: variantIds }, remainingQuantity: { gt: 0 } }, include: { storageLocation: true, order: { select: { id: true, seller: true } } }, orderBy: { acquiredOn: "asc" } }),
-    db.storageLocation.findMany({ where: { userId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    db.storageLocation.findMany({ where: { userId }, orderBy: { name: "asc" }, select: { id: true, name: true, type: true } }),
     db.lot.findMany({ where: { userId, order: { currency: "USD" } }, select: { quantity: true, unitPrice: true, landedTotal: true } }),
     db.deck.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, select: { id: true, name: true } }),
     db.deckCard.findMany({ where: { cardId: card.id, deck: { userId } }, include: { deck: { select: { id: true, name: true } } } }),
@@ -154,6 +157,15 @@ export default async function CardPage({ params, searchParams }: { params: Promi
   const latestTcgByVariant = new Map<string, (typeof snaps)[number]>();
   for (const s of snaps) if (s.source === "TCGPLAYER") latestTcgByVariant.set(s.variantId, s);
   const selectedHeld = heldByVariant.get(selected.id) ?? 0;
+  // Market price of the selected printing for "Add to collection" (display currency, chosen source).
+  const quickQuote = await quoteVariants(db, userId, demo, [selected.id]);
+  const quickMarket = quickQuote.quotes[selected.id]?.unit ?? null;
+  // Default binder: one named after this printing's set if you have it, else where you keep this card already, else none.
+  const quickBinder = locations.some((l) => l.name.toLowerCase() === selected.set.code.toLowerCase())
+    ? suggestBinder(locations, selected.set.code)
+    : lots.find((l) => l.storageLocationId)?.storageLocationId
+      ? { id: lots.find((l) => l.storageLocationId)!.storageLocationId! }
+      : { none: true as const };
   const watch = watches.find((w) => w.variantId === selected.id) ?? null;
   const watchDeck = watchDeckId ? (myDecks.find((d) => d.id === watchDeckId) ?? null) : null;
   const rotatesOn = card.set.rotatesOn ? dayKey(card.set.rotatesOn) : null;
@@ -218,7 +230,18 @@ export default async function CardPage({ params, searchParams }: { params: Promi
           <PriceHeadline snaps={selSnaps.filter((s) => s.source === "TCGPLAYER")} manual={selManual} conv={conv} display={display} />
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button asChild>
+            <QuickAdd
+              key={selected.id}
+              variantId={selected.id}
+              cardName={card.name}
+              printingLabel={`${selected.set.code}·${String(selected.collectorNumber ?? "").padStart(3, "0")} ${ART_LABEL[selected.art as VariantArt]} ${selected.finish === "FOIL" ? "Foil" : "Normal"}`}
+              market={quickMarket}
+              currency={quickQuote.currency}
+              locations={locations}
+              defaultBinder={quickBinder}
+              today={today}
+            />
+            <Button asChild variant="secondary">
               <Link href={`/collection/add?variant=${selected.id}`}>Add purchase</Link>
             </Button>
             {selectedHeld > 0 && (

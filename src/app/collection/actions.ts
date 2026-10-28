@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentUserId } from "@/lib/currentUser";
+import { getCurrentUserId, isDemoMode } from "@/lib/currentUser";
+import { quoteVariants } from "@/lib/prices/quote";
+import { loadSetSlots, missingToAdd } from "@/lib/collection/binder";
 import { allocateLandedCost } from "@/lib/money/landedCost";
 import { consumeFifo, InsufficientQuantityError } from "@/lib/money/fifo";
 import { CONDITIONS, CURRENCIES } from "@/lib/domain/enums";
@@ -198,6 +200,171 @@ export async function deleteSale(saleId: string): Promise<Result> {
   ]);
   refresh();
   return { ok: true, data: undefined, message: "Sale deleted — the cards are back in your collection." };
+}
+
+// ───────────────────── Quick add · Complete the set ─────────────────────
+
+/** Where the cards go: an existing location, a new binder by name (reused if that name exists), or none. */
+const BinderChoice = z.union([
+  z.object({ id: z.string().min(1) }),
+  z.object({ newName: z.string().trim().min(1, "Name the binder").max(60, "That name is too long") }),
+  z.object({ none: z.literal(true) }),
+]);
+type BinderChoiceT = z.infer<typeof BinderChoice>;
+
+async function resolveBinder(tx: Pick<typeof db, "storageLocation">, userId: string, b: BinderChoiceT): Promise<{ id: string | null; name: string | null }> {
+  if ("none" in b) return { id: null, name: null };
+  if ("id" in b) {
+    const loc = await tx.storageLocation.findFirst({ where: { id: b.id, userId } });
+    if (!loc) throw new UserError("That binder no longer exists — pick another.");
+    return { id: loc.id, name: loc.name };
+  }
+  const loc = await tx.storageLocation.upsert({ where: { userId_name: { userId, name: b.newName } }, update: {}, create: { userId, name: b.newName, type: "BINDER" } });
+  return { id: loc.id, name: loc.name };
+}
+
+class UserError extends Error {}
+
+/** Market price per variant in the display currency (null = no price). */
+async function marketUnits(userId: string, variantIds: string[]) {
+  const q = await quoteVariants(db, userId, await isDemoMode(), variantIds);
+  if (q.missing.length) throw new UserError(`No exchange rate for ${q.missing.join(", ")} yet — set one in Settings.`);
+  return { currency: q.currency, unit: (id: string) => q.quotes[id]?.unit ?? null };
+}
+
+const QuickAddInput = z.object({
+  variantId: z.string().min(1),
+  quantity: z.number().int().min(1, "At least 1").max(1000),
+  condition: z.enum(CONDITIONS),
+  cost: z.enum(["market", "zero"]),
+  binder: BinderChoice,
+  acquiredOn: day.refine(notInFuture, "The date can't be in the future"),
+});
+export type QuickAddPayload = z.input<typeof QuickAddInput>;
+
+/** Adds copies of one printing without the purchase form — as a one-line order, so it can be undone. */
+export async function quickAddToCollection(payload: QuickAddPayload): Promise<Result<{ orderId: string; binder: string | null }>> {
+  const parsed = QuickAddInput.safeParse(payload);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message, fieldErrors: fieldErrors(parsed.error) };
+  const o = parsed.data;
+  const userId = await getCurrentUserId();
+  const variant = await db.cardVariant.findUnique({ where: { id: o.variantId }, include: { card: { select: { name: true } }, set: { select: { code: true } } } });
+  if (!variant) return { ok: false, message: "That card no longer exists — reload the page." };
+  try {
+    const market = await marketUnits(userId, [variant.id]);
+    const unit = o.cost === "market" ? (market.unit(variant.id) ?? 0) : 0;
+    const acquiredOn = dayToDate(o.acquiredOn);
+    const result = await db.$transaction(async (tx) => {
+      const loc = await resolveBinder(tx, userId, o.binder);
+      const order = await tx.order.create({
+        data: { userId, orderedOn: acquiredOn, seller: `Added: ${variant.card.name}`.slice(0, 120), currency: market.currency, notes: "Added with “Add to collection” on the card page." },
+      });
+      await tx.lot.create({
+        data: {
+          userId,
+          orderId: order.id,
+          variantId: variant.id,
+          quantity: o.quantity,
+          remainingQuantity: o.quantity,
+          unitPrice: unit,
+          landedUnitCost: unit,
+          landedTotal: unit * o.quantity,
+          currency: market.currency,
+          condition: o.condition,
+          acquiredOn,
+          storageLocationId: loc.id,
+          notes: o.cost === "market" ? (market.unit(variant.id) != null ? "cost = market price when added" : "no price — cost 0") : "cost not recorded",
+        },
+      });
+      return { orderId: order.id, binder: loc.name };
+    });
+    refresh();
+    return { ok: true, data: result, message: `Added ${o.quantity} × ${variant.card.name}${result.binder ? ` to ${result.binder}` : ""}.` };
+  } catch (e) {
+    if (e instanceof UserError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+const CompleteSetInput = z.object({
+  setCode: z.string().min(1),
+  scope: z.enum(["base", "all"]),
+  cost: z.enum(["market", "zero"]),
+  binder: BinderChoice,
+  moveOwned: z.boolean(),
+  acquiredOn: day.refine(notInFuture, "The date can't be in the future"),
+});
+export type CompleteSetPayload = z.input<typeof CompleteSetInput>;
+
+/**
+ * "Complete the set": one copy of every card in the set's checklist you don't own yet, in one order
+ * placed in the chosen binder (undo = delete the order). Optionally moves the copies you already own
+ * from this set into the same binder.
+ */
+export async function completeSet(payload: CompleteSetPayload): Promise<Result<{ orderId: string | null; added: number; moved: number; binder: string | null }>> {
+  const parsed = CompleteSetInput.safeParse(payload);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
+  const o = parsed.data;
+  const userId = await getCurrentUserId();
+  const set = await db.set.findUnique({ where: { code: o.setCode } });
+  if (!set) return { ok: false, message: "That set isn't in the catalogue." };
+  const held = await db.lot.groupBy({ by: ["variantId"], where: { userId, remainingQuantity: { gt: 0 } }, _sum: { remainingQuantity: true } });
+  const ownedByVariant = new Map(held.map((h) => [h.variantId, h._sum.remainingQuantity ?? 0]));
+  const slots = await loadSetSlots(db, set.id, o.scope, [...ownedByVariant.keys()]);
+  const toAdd = missingToAdd(slots, ownedByVariant);
+  const setVariantIds = slots.flatMap((s) => s.variantIds);
+  if (!toAdd.length && !o.moveOwned) return { ok: true, data: { orderId: null, added: 0, moved: 0, binder: null }, message: `You already have every card in ${set.name}.` };
+
+  try {
+    const market = await marketUnits(userId, toAdd.map((t) => t.variantId));
+    const acquiredOn = dayToDate(o.acquiredOn);
+    const result = await db.$transaction(
+      async (tx) => {
+        const loc = await resolveBinder(tx, userId, o.binder);
+        let moved = 0;
+        if (o.moveOwned && loc.id) {
+          const r = await tx.lot.updateMany({ where: { userId, remainingQuantity: { gt: 0 }, variantId: { in: setVariantIds }, NOT: { storageLocationId: loc.id } }, data: { storageLocationId: loc.id } });
+          moved = r.count;
+        }
+        let orderId: string | null = null;
+        if (toAdd.length) {
+          const order = await tx.order.create({
+            data: { userId, orderedOn: acquiredOn, seller: `Complete the set: ${set.name}`.slice(0, 120), currency: market.currency, notes: `Added with “Complete the set” in the set binder (${o.scope === "all" ? "every printing" : "base set"}).` },
+          });
+          orderId = order.id;
+          for (const t of toAdd) {
+            const price = market.unit(t.variantId);
+            const unit = o.cost === "market" ? (price ?? 0) : 0;
+            await tx.lot.create({
+              data: {
+                userId,
+                orderId: order.id,
+                variantId: t.variantId,
+                quantity: 1,
+                remainingQuantity: 1,
+                unitPrice: unit,
+                landedUnitCost: unit,
+                landedTotal: unit,
+                currency: market.currency,
+                condition: "NM",
+                acquiredOn,
+                storageLocationId: loc.id,
+                notes: o.cost === "market" ? (price != null ? "cost = market price when added" : "no price — cost 0") : "cost not recorded",
+              },
+            });
+          }
+        }
+        return { orderId, added: toAdd.length, moved, binder: loc.name };
+      },
+      { timeout: 60_000 },
+    );
+    refresh();
+    const parts = [result.added ? `Added ${result.added} ${result.added === 1 ? "card" : "cards"}` : null, result.moved ? `moved ${result.moved} ${result.moved === 1 ? "purchase" : "purchases"} you already had` : null].filter(Boolean);
+    return { ok: true, data: result, message: `${parts.join(" and ") || "Nothing to change"}${result.binder ? ` — all in ${result.binder}` : ""}.` };
+  } catch (e) {
+    if (e instanceof UserError) return { ok: false, message: e.message };
+    throw e;
+  }
 }
 
 // ───────────────────────────── Lots ─────────────────────────────

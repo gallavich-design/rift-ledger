@@ -4,7 +4,10 @@ import { db } from "@/lib/db";
 import { getCurrentUserId, isDemoMode } from "@/lib/currentUser";
 import { getFx, getPriceBook, getSettings, missingRates } from "@/lib/portfolio/data";
 import { valuationSource } from "@/lib/prices/quote";
-import { completeBinder, type ChecklistSlot } from "@/lib/collection/binder";
+import { completeBinder, loadSetSlots, missingToAdd, type ChecklistSlot } from "@/lib/collection/binder";
+import { suggestBinder } from "@/lib/collection/binderChoice";
+import { dayKey } from "@/config/app";
+import { CompleteSet } from "./CompleteSet";
 import { ART_LABEL, SOURCE_LABEL, type VariantArt } from "@/lib/domain/enums";
 import { convert, formatMoney, formatPct } from "@/lib/money/money";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -52,15 +55,8 @@ export default async function BinderPage({ searchParams }: { searchParams: Promi
     );
   }
 
-  const variants = await db.cardVariant.findMany({
-    where: { setId: set.id, language: "EN", gradingCompany: null, ...(scope === "base" ? { art: { in: ["STANDARD", "PROMO"] } } : {}) },
-    select: { id: true, cardId: true, collectorNumber: true, art: true, finish: true, rarity: true, imageUrl: true, card: { select: { name: true, orientation: true } } },
-  });
-  // Graded / foreign copies count toward their printing's slot too.
-  const extra = await db.cardVariant.findMany({
-    where: { setId: set.id, OR: [{ language: { not: "EN" } }, { gradingCompany: { not: null } }], id: { in: [...ownedByVariant.keys()] } },
-    select: { id: true, cardId: true, collectorNumber: true, art: true },
-  });
+  const setSlots = await loadSetSlots(db, set.id, scope, [...ownedByVariant.keys()]);
+  const variants = setSlots.flatMap((s) => s.printings);
 
   const source = await valuationSource(db, userId, demo);
   const [fx, book] = await Promise.all([getFx(db, settings.fxOverrides), getPriceBook(db, userId, variants.map((v) => v.id), source)]);
@@ -74,29 +70,27 @@ export default async function BinderPage({ searchParams }: { searchParams: Promi
 
   // One slot per printing (card + number + art); normal and foil fill the same slot.
   const slots = new Map<string, ChecklistSlot & { art: string; landscape: boolean }>();
-  for (const v of variants) {
-    const k = `${v.cardId}|${v.collectorNumber}|${v.art}`;
-    const s = slots.get(k) ?? {
-      number: v.collectorNumber ?? 9999,
-      cardId: v.cardId,
-      name: v.card.name,
-      rarity: v.rarity,
-      imageUrl: v.imageUrl,
-      variantIds: [],
-      cheapest: null,
-      art: v.art,
-      landscape: v.card.orientation === "landscape",
-    };
-    s.variantIds.push(v.id);
-    if (v.finish === "NORMAL" && v.imageUrl) s.imageUrl = v.imageUrl;
-    const q = book.get(v.id);
-    if (q) {
+  for (const ss of setSlots) {
+    let cheapest: number | null = null;
+    for (const v of ss.printings) {
+      const q = book.get(v.id);
+      if (!q) continue;
       const amt = convert(q.amount, q.currency, display, fx.table);
-      if (s.cheapest == null || amt < s.cheapest) s.cheapest = amt;
+      if (cheapest == null || amt < cheapest) cheapest = amt;
     }
-    slots.set(k, s);
+    slots.set(ss.key, { number: ss.number, cardId: ss.cardId, name: ss.name, rarity: ss.rarity, imageUrl: ss.imageUrl, variantIds: ss.variantIds, cheapest, art: ss.art, landscape: ss.landscape });
   }
-  for (const e of extra) slots.get(`${e.cardId}|${e.collectorNumber}|${e.art}`)?.variantIds.push(e.id);
+
+  // What "Complete the set" would add, priced the same way the action prices it.
+  const toAdd = missingToAdd(setSlots, ownedByVariant);
+  let addTotal = 0;
+  let addUnpriced = 0;
+  for (const t of toAdd) {
+    const q = book.get(t.variantId);
+    if (q) addTotal += convert(q.amount, q.currency, display, fx.table);
+    else addUnpriced++;
+  }
+  const locations = await db.storageLocation.findMany({ where: { userId }, orderBy: { name: "asc" }, select: { id: true, name: true, type: true } });
 
   const binder = completeBinder([...slots.values()], ownedByVariant);
   const shown = binder.slots.filter((s) => (show === "missing" ? s.owned === 0 : show === "owned" ? s.owned > 0 : true));
@@ -149,6 +143,20 @@ export default async function BinderPage({ searchParams }: { searchParams: Promi
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-inset" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(binder.pct)} aria-label="Set completion">
           <div className="h-full rounded-full bg-quill" style={{ width: `${binder.pct}%` }} />
         </div>
+        <CompleteSet
+          key={`${set.code}-${scope}`}
+          setCode={set.code}
+          setName={set.name}
+          scope={scope}
+          missing={toAdd.length}
+          have={binder.have}
+          marketTotal={addTotal}
+          unpriced={addUnpriced}
+          currency={display}
+          locations={locations}
+          defaultBinder={suggestBinder(locations, set.code)}
+          today={dayKey()}
+        />
       </section>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">

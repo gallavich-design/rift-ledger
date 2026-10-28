@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-28 — Add to collection, Complete the set
+
+No schema changes (binders are your storage locations).
+
+- **Add to collection** on every card page: adds the printing you're viewing — copies, condition, binder (or a new one), date, and cost at market price or not recorded — without the purchase form. It's saved as a one-line order ("Added: …"), so "View or undo" deletes it. "Add purchase" is still there for recording what you paid, the seller and shipping.
+- **Complete the set** in the set binder: asks which binder (suggests a new one named after the set, e.g. "OGN", or the one you already have with that name) and adds one copy of every card from the checklist you're viewing (Base set or Every printing) that you don't have — normal finish where there is one, NM — as one order you can undo. Optionally moves the copies you already own from that set into the same binder.
+- The binder checklist is now built in one shared place, so "Complete the set" fills exactly the slots the binder shows as missing.
+
 ## 2026-10-28 — Deck image: Chosen Champion beside the Legend
 
 - The exported deck image now starts Legend → Chosen Champion → runes → battlefields, so the Champion sits right next to the Legend (in both "Deck order" and "By card type").
