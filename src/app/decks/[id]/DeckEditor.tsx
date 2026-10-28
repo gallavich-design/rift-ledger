@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Check, ChevronDown, Minus, Plus, Search, X } from "lucide-react";
+import { Check, ChevronDown, LayoutGrid, List, Minus, Plus, Search, X } from "lucide-react";
 import { validateDeck, type Issue } from "@/lib/decks/validate";
 import { costDeck, type CardPricing } from "@/lib/decks/cost";
 import { deckStats } from "@/lib/decks/stats";
@@ -18,6 +18,7 @@ import { cn } from "@/lib/ui";
 import { saveDeck } from "../actions";
 import { MarkOwned } from "./MarkOwned";
 import { DeckStatsPanel } from "./DeckStats";
+import { DeckGallery } from "@/components/decks/DeckGallery";
 
 interface Props {
   deckId: string;
@@ -54,6 +55,23 @@ export function DeckEditor(p: Props) {
   const [open, setOpen] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
+  // Cards (pictures) by default; ?view=list or the last choice on this device switches to the list.
+  const [view, setView] = useState<"cards" | "list">("cards");
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("view");
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem("rl-deck-view");
+    } catch {}
+    const v = q === "list" || q === "cards" ? q : saved;
+    if (v === "list" || v === "cards") setView(v);
+  }, []);
+  const chooseView = (v: "cards" | "list") => {
+    setView(v);
+    try {
+      localStorage.setItem("rl-deck-view", v);
+    } catch {}
+  };
 
   // Server data changed (e.g. an import line was resolved) and nothing local is unsaved → adopt it.
   const serverKey = JSON.stringify(p.initialLines) + p.initialName;
@@ -148,6 +166,14 @@ export function DeckEditor(p: Props) {
     lines
       .filter((l) => l.section === s && l.quantity > 0)
       .sort((a, b) => (cards.get(a.cardId)?.energy ?? 99) - (cards.get(b.cardId)?.energy ?? 99) || (names.get(a.cardId) ?? "").localeCompare(names.get(b.cardId) ?? ""));
+  const galleryIssues = useMemo(() => new Map([...issuesByCard].map(([id, is]) => [id, is[0].message])), [issuesByCard]);
+  const galleryEdit = useMemo(
+    () => ({
+      inc: (l: DeckLine) => update(key(l), { quantity: l.quantity + 1 }),
+      dec: (l: DeckLine) => update(key(l), { quantity: l.quantity - 1, proxyQuantity: Math.min(l.proxyQuantity, l.quantity - 1) }),
+    }),
+    [update],
+  );
   const costLine = (cardId: string) => cost.lines.find((x) => x.cardId === cardId);
   const fmt = (n: number) => formatMoney(n, p.currency);
 
@@ -213,8 +239,31 @@ export function DeckEditor(p: Props) {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* ── List ── */}
         <div className="min-w-0 space-y-6">
-          <CardAdder onAdd={(id) => addCard(id)} />
-          {SECTIONS.map((s) => {
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <CardAdder onAdd={(id) => addCard(id)} />
+            </div>
+            <div className="inline-flex rounded-[var(--radius-control)] border border-rule bg-sheet p-0.5" role="group" aria-label="Show deck as">
+              {(
+                [
+                  ["cards", "Cards", LayoutGrid],
+                  ["list", "List", List],
+                ] as const
+              ).map(([v, label, Icon]) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={view === v}
+                  onClick={() => chooseView(v)}
+                  className={cn("inline-flex h-8 items-center gap-1.5 rounded-[5px] px-3 text-sm", view === v ? "bg-ink text-sheet" : "text-ink-2 hover:bg-hover")}
+                >
+                  <Icon size={14} aria-hidden /> {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {view === "cards" && <DeckGallery lines={lines} cards={cards} owned={owned} edit={galleryEdit} issues={galleryIssues} />}
+          {view === "list" && SECTIONS.map((s) => {
             const ls = sectionLines(s);
             const count = validation.counts[s] + (s === "MAIN" ? validation.counts.CHAMPION : 0);
             const sectionIssues = validation.issues.some((i) => sectionRule(i.rule) === s);
@@ -360,7 +409,12 @@ export function DeckEditor(p: Props) {
         </div>
 
         {/* ── Panels ── */}
-        <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start" aria-label="Deck checks">
+        {/* Not sticky: the column is taller than the screen, and a sticky one hides its lower panels until the deck ends. */}
+        <aside className="min-w-0 space-y-4" aria-label="Deck checks">
+          <Panel title="Stats" testid="stats">
+            <DeckStatsPanel stats={stats} />
+          </Panel>
+
           <Panel title="Legality" testid="legality">
             {validation.legal ? (
               <p className="flex items-center gap-2 text-sm text-gain">
@@ -434,10 +488,6 @@ export function DeckEditor(p: Props) {
                 </ul>
               </details>
             )}
-          </Panel>
-
-          <Panel title="Stats" testid="stats">
-            <DeckStatsPanel stats={stats} />
           </Panel>
         </aside>
       </div>

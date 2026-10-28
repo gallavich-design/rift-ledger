@@ -16,7 +16,8 @@ test("pasting a decklist creates the deck and lists every unrecognised line", as
   await page.getByLabel("Decklist", { exact: true }).fill(`${list.text}\nSideboard:\n2 Definitely Not A Card\n1 Qqqq Zzzz`);
   await page.getByRole("button", { name: "Import deck" }).click();
   await expect(page).toHaveURL(/\/decks\/(?!new$)[^/]+$/);
-  deckUrl = page.url();
+  // The row-based tests below use the list view; the cards view has its own test.
+  deckUrl = page.url() + "?view=list";
   await expect(page.getByTestId("pending-line")).toHaveCount(2);
   await expect(page.getByTestId("pending-import")).toContainText("2 Definitely Not A Card");
   await expect(page.getByTestId("pending-import")).toContainText("1 Qqqq Zzzz");
@@ -56,6 +57,31 @@ test("breaking a rule shows a specific error; fixing it clears the error", async
   await expect(page.getByTestId("legality")).toContainText("Main deck has 37 cards (with your Chosen Champion) — it needs at least 40. Add 3.");
   await page.getByRole("button", { name: "Discard" }).click();
   await expect(page.getByTestId("legal-badge")).toHaveText("Legal");
+});
+
+test("the deck shows as card pictures; clicking one opens its details", async ({ page }) => {
+  const list = await legalList();
+  await page.goto(deckUrl.replace("?view=list", ""));
+  const gallery = page.getByTestId("deck-gallery");
+  await expect(gallery.getByRole("region", { name: "Runes" })).toContainText("12/12");
+  await expect(gallery.getByRole("region", { name: "Battlefields" })).toContainText("3/3");
+  const card = list.main[0];
+  await gallery.getByRole("button", { name: new RegExp(`^${card.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}, \\d`) }).first().click();
+  const dialog = page.getByTestId("card-dialog");
+  await expect(dialog.getByRole("heading", { level: 2 })).toHaveText(card);
+  await expect(dialog).toContainText("Description");
+  await expect(dialog).toContainText("Card number:");
+  await expect(dialog).toContainText("Energy");
+  // the stepper in the dialog edits the deck
+  await dialog.getByRole("button", { name: `One more ${card}` }).click();
+  await expect(page.getByTestId("legality")).toContainText(`the limit is 3.`);
+  await dialog.getByRole("button", { name: `One fewer ${card}` }).click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId("legal-badge")).toHaveText("Legal");
+  // switching to the list shows rows
+  await page.getByRole("button", { name: "List" }).click();
+  await expect(row(page, "MAIN", card)).toBeVisible();
 });
 
 test("budget build is never more than the normal build and lists each swap", async ({ page }) => {
@@ -126,6 +152,10 @@ test("decks list, share link and text export work", async ({ page }) => {
   await shared.goto(link);
   await expect(shared.getByRole("heading", { level: 1 })).toHaveText("E2E Test Deck");
   await expect(shared.locator("main")).not.toContainText("฿");
+  await expect(shared.getByTestId("gallery-card").first()).toBeVisible();
+  await shared.getByTestId("gallery-card").first().click();
+  await expect(shared.getByTestId("card-dialog")).toContainText("Card information");
+  await expect(shared.getByTestId("card-dialog").getByRole("link", { name: /Card page/ })).toHaveCount(0);
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Text" }).click()]);
   expect(download.suggestedFilename()).toBe("E2E-Test-Deck.txt");
   // Image: an A4 card-grid PNG, made on the server, with layout and background options

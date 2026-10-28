@@ -12,13 +12,18 @@ import type { SnapshotLine } from "./diff";
 
 export interface EditorCard extends DeckCardInfo {
   setCode: string;
+  setName: string;
   collectorNumber: number | null;
   orientation: string;
+  rarity: string | null;
+  rulesText: string;
+  rulesTextRich: string;
+  flavourText: string | null;
 }
 
 export async function loadDeckCards(db: PrismaClient, cardIds: string[]): Promise<Map<string, EditorCard>> {
   if (!cardIds.length) return new Map();
-  const cards = await db.card.findMany({ where: { id: { in: cardIds } }, include: { set: { select: { code: true, standardLegal: true, rotatesOn: true } } } });
+  const cards = await db.card.findMany({ where: { id: { in: cardIds } }, include: { set: { select: { code: true, name: true, standardLegal: true, rotatesOn: true } } } });
   return new Map(
     cards.map((c) => [
       c.id,
@@ -36,8 +41,13 @@ export async function loadDeckCards(db: PrismaClient, cardIds: string[]): Promis
         standardLegal: c.set.standardLegal,
         rotatesOn: c.set.rotatesOn ? dayKey(c.set.rotatesOn) : null,
         setCode: c.set.code,
+        setName: c.set.name,
         collectorNumber: c.collectorNumber,
         orientation: c.orientation,
+        rarity: c.rarity,
+        rulesText: c.rulesText,
+        rulesTextRich: c.rulesTextRich,
+        flavourText: c.flavourText,
       },
     ]),
   );

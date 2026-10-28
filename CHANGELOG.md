@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-28 — Deck page shows card pictures
+
+- Decks now open in a **Cards** view like Piltover Archive: Legend and Runes on top, then Battlefields, Main deck (Chosen Champion first) and Sideboard, each with a count against its target (12/12, 3/3, 40/40, 10/10) and a ×N badge on every card.
+- Click any card to see its details: picture, type, rarity and domains, Energy / Power / Might, rules text, set and card number. In your own deck you can change the copies right there; the dialog also says how many you own.
+- **List** toggle keeps the old rows (printing, proxies, sideboard moves). The choice is remembered; `?view=list` opens it directly.
+- Shared deck links show the same picture view (no prices, no ownership).
+- Right column: Stats now comes first, with Legality and Cost under it. The column no longer sticks while scrolling, so it scrolls smoothly with the page instead of waiting for the deck to end.
+
 ## Deck image options, sideboard 10, new stats panel (2026-10-28)
 
 No schema changes.
