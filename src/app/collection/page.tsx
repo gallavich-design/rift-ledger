@@ -114,7 +114,7 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Filter label="Stored in" current={sp.location} options={[["", "Anywhere"], ...locations.map((l) => [l.id, l.name] as [string, string]), ["none", "Unassigned"]]} href={(v) => href({ location: v || undefined })} />
+            <Filter label="Stored in" current={sp.location} options={[["", "Anywhere"], ...locations.map((l) => [l.id, l.name] as [string, string]), ["none", "No binder"]]} href={(v) => href({ location: v || undefined })} />
             <Filter label="Set" current={sp.set} options={[["", "All sets"], ...setCodes.map((c) => [c, c] as [string, string])]} href={(v) => href({ set: v || undefined })} />
             <form action="/collection" className="flex h-8 items-center rounded-full border border-rule bg-sheet pr-1 pl-3 text-[13px] focus-within:border-quill" role="search">
               {Object.entries(sp).map(([k, v]) => (k !== "q" && k !== "page" && v ? <input key={k} type="hidden" name={k} value={v} /> : null))}
@@ -140,7 +140,7 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
               {pageItems.map((p) => {
                 const v = info.get(p.variantId)!;
                 const pl = lotsByVariant.get(p.variantId) ?? [];
-                const where = [...new Set(pl.map((l) => (l.storageLocationId ? locName.get(l.storageLocationId) : "Unassigned")))];
+                const where = [...new Set(pl.map((l) => (l.storageLocationId ? locName.get(l.storageLocationId) : "No binder")))];
                 return (
                   <li key={p.variantId} className="border-b border-rule-soft last:border-b-0" data-testid="position">
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 px-4 py-3 md:grid-cols-[minmax(0,1fr)_56px_110px_130px_150px] md:items-center">

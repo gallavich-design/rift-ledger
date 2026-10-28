@@ -7,7 +7,7 @@ import { getCurrentUserId, isDemoMode } from "@/lib/currentUser";
 import { quoteVariants } from "@/lib/prices/quote";
 import { loadSetSlots, missingToAdd } from "@/lib/collection/binder";
 import { allocateLandedCost } from "@/lib/money/landedCost";
-import { consumeFifo, InsufficientQuantityError } from "@/lib/money/fifo";
+import { consumeFifo, costOfFirst, InsufficientQuantityError } from "@/lib/money/fifo";
 import { CONDITIONS, CURRENCIES } from "@/lib/domain/enums";
 import { dayKey, dayToDate } from "@/config/app";
 import { evaluateWatches } from "@/lib/alerts/service";
@@ -379,6 +379,35 @@ export async function moveLot(lotId: string, storageLocationId: string | null): 
   if (!r.count) return { ok: false, message: "That purchase no longer exists." };
   refresh();
   return { ok: true, data: undefined };
+}
+
+const RemoveInput = z.object({ lotId: z.string().min(1), quantity: z.number().int().min(1, "Remove at least 1") });
+
+/**
+ * Takes copies out of your collection — for cards added by mistake, given away or lost (a sale is
+ * "Record sale"). Only unsold copies; the removed copies take their share of the lot's cost with them
+ * and sales already recorded keep theirs. A lot with nothing left is deleted, and so is an order that
+ * ends up empty.
+ */
+export async function removeCopies(payload: z.input<typeof RemoveInput>): Promise<Result<{ removed: number }>> {
+  const parsed = RemoveInput.safeParse(payload);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
+  const { lotId, quantity } = parsed.data;
+  const userId = await getCurrentUserId();
+  const lot = await db.lot.findFirst({ where: { id: lotId, userId } });
+  if (!lot) return { ok: false, message: "Those copies are already gone — reload the page." };
+  if (quantity > lot.remainingQuantity) return { ok: false, message: `Only ${lot.remainingQuantity} unsold ${lot.remainingQuantity === 1 ? "copy is" : "copies are"} left to remove.` };
+  const keep = lot.quantity - quantity; // sold copies stay on the lot, with the cost of the first `keep` units
+  await db.$transaction(async (tx) => {
+    if (keep === 0) await tx.lot.delete({ where: { id: lot.id } });
+    else {
+      const landedTotal = costOfFirst(lot, keep);
+      await tx.lot.update({ where: { id: lot.id }, data: { quantity: keep, remainingQuantity: lot.remainingQuantity - quantity, landedTotal, landedUnitCost: Math.floor(landedTotal / keep) } });
+    }
+    if (lot.orderId && !(await tx.lot.count({ where: { orderId: lot.orderId } }))) await tx.order.delete({ where: { id: lot.orderId } });
+  });
+  refresh();
+  return { ok: true, data: { removed: quantity }, message: `Removed ${quantity} ${quantity === 1 ? "copy" : "copies"} from your collection.` };
 }
 
 // ───────────────────────────── Prices ─────────────────────────────

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-28 — Take cards out of a binder, or remove them
+
+- Card page → Your copies: each row now has a labelled **Binder** picker — choose **No binder** to take the copies out of their binder (they stay in your collection) — and a **Remove** button that takes unsold copies out of your collection (pick how many; asks first). Removed copies take their share of the cost with them; recorded sales are untouched; an order left empty is deleted.
+- "Unassigned" is now called "No binder" everywhere.
+
 ## 2026-10-28 — Fix: "Application error" after Complete the set
 
 No schema changes.

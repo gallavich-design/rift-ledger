@@ -73,3 +73,48 @@ test("Complete the set asks for a binder and fills every missing slot of the set
   const loc = await db.storageLocation.findFirstOrThrow({ where: { userId, name: SET } });
   await expect(page.getByTestId("complete-set-panel").getByTestId("binder-select")).toHaveValue(loc.id);
 });
+
+test("Cards can be taken out of a binder, and removed from the collection a few copies at a time", async ({ page }) => {
+  const userId = await ownerId();
+  const variant = await db.cardVariant.findFirstOrThrow({
+    where: { set: { code: "OGN" }, art: "STANDARD", finish: "NORMAL", language: "EN", gradingCompany: null, lots: { none: {} } },
+    include: { card: true },
+    orderBy: { collectorNumber: "desc" },
+  });
+  await page.goto(`/cards/${variant.cardId}?v=${variant.id}`);
+  await page.getByTestId("quick-add").click();
+  const panel = page.getByTestId("quick-add-panel");
+  await panel.getByRole("button", { name: "One more copy" }).click();
+  await panel.getByRole("button", { name: "One more copy" }).click();
+  await panel.getByTestId("binder-select").selectOption("__new");
+  await panel.getByTestId("binder-new-name").fill("E2E Remove Binder");
+  await panel.getByTestId("quick-add-confirm").click();
+  await expect(page.getByTestId("quick-add-result")).toContainText("Added 3 ×");
+
+  const row = page.getByTestId("your-copies").locator("li").filter({ hasText: "3×" });
+  // Take them out of the binder (they stay in the collection).
+  await expect(row.getByTestId("lot-binder").locator("option:checked")).toHaveText("E2E Remove Binder");
+  await row.getByTestId("lot-binder").selectOption("");
+  await expect(row).toContainText("Taken out of the binder");
+  const lot = await db.lot.findFirstOrThrow({ where: { userId, variantId: variant.id } });
+  expect(lot.storageLocationId).toBeNull();
+  expect(lot.remainingQuantity).toBe(3);
+
+  // Remove 2 of the 3.
+  await row.getByTestId("lot-remove").click();
+  const rm = page.getByTestId("lot-remove-panel");
+  await expect(rm.getByTestId("lot-remove-qty")).toHaveText("3");
+  await rm.getByRole("button", { name: "Remove one fewer" }).click();
+  await rm.getByTestId("lot-remove-confirm").click();
+  await expect(page.getByTestId("your-copies").locator("li").filter({ hasText: "1×" })).toBeVisible();
+  const after = await db.lot.findUniqueOrThrow({ where: { id: lot.id } });
+  expect(after).toMatchObject({ quantity: 1, remainingQuantity: 1 });
+  expect(after.landedTotal).toBe(Math.floor(lot.landedTotal / 3));
+
+  // Remove the last one: the lot and its now-empty order are gone.
+  await page.getByTestId("your-copies").getByTestId("lot-remove").click();
+  await page.getByTestId("lot-remove-confirm").click();
+  await expect(page.getByText("You don't own this card yet.")).toBeVisible();
+  expect(await db.lot.count({ where: { id: lot.id } })).toBe(0);
+  expect(await db.order.count({ where: { id: lot.orderId! } })).toBe(0);
+});

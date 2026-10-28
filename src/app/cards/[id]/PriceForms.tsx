@@ -5,7 +5,9 @@ import { MoneyField, Segmented, TextField } from "@/components/ui/fields";
 import { Button } from "@/components/ui/Button";
 import { parseMoneyInput } from "@/lib/money/money";
 import { CURRENCIES, type Currency } from "@/lib/domain/enums";
-import { clearManualPrice, reportLocalPrice, setManualPrice, moveLot } from "@/app/collection/actions";
+import { clearManualPrice, reportLocalPrice, setManualPrice, moveLot, removeCopies } from "@/app/collection/actions";
+import { useRouter } from "next/navigation";
+import { Minus, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/ui";
 
 const PLACES = ["Facebook group", "Local shop", "Shopee", "Lazada", "Discord", "Event / tournament"];
@@ -128,33 +130,112 @@ export function ManualPriceForm({ variantId, current, defaultCurrency }: { varia
   );
 }
 
+/** Which binder (or other storage) these copies are in. "No binder" takes them out of it but keeps them. */
 export function MoveLotSelect({ lotId, current, locations }: { lotId: string; current: string | null; locations: { id: string; name: string }[] }) {
   const [value, setValue] = useState(current ?? "");
   const [pending, start] = useTransition();
+  const [saved, setSaved] = useState(false);
   return (
     <label className="inline-flex items-center gap-1.5 text-xs text-ink-3">
-      <span className="sr-only">Stored in</span>
+      <span>Binder</span>
       <select
         value={value}
         disabled={pending}
         onChange={(e) => {
           const v = e.target.value;
           setValue(v);
+          setSaved(false);
           start(async () => {
-            await moveLot(lotId, v || null);
+            const r = await moveLot(lotId, v || null);
+            setSaved(r.ok);
           });
         }}
         className="h-7 max-w-44 rounded-[var(--radius-control)] border border-rule bg-inset px-2 text-xs text-ink-2 hover:border-rule-strong focus:border-quill focus:outline-none"
+        data-testid="lot-binder"
       >
-        <option value="">Unassigned</option>
+        <option value="">No binder</option>
         {locations.map((l) => (
           <option key={l.id} value={l.id}>
             {l.name}
           </option>
         ))}
       </select>
-      {pending && <span>Moving…</span>}
+      {pending ? <span>Moving…</span> : saved ? <span className="text-gain">{value ? "Moved" : "Taken out of the binder"}</span> : null}
     </label>
+  );
+}
+
+/** "Remove": takes unsold copies out of your collection (not a sale — that's "Record sale"). */
+export function RemoveCopies({ lotId, remaining, label }: { lotId: string; remaining: number; label: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [n, setN] = useState(remaining);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  if (!open)
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setN(remaining);
+          setMsg(null);
+          setOpen(true);
+        }}
+        className="inline-flex h-7 items-center gap-1 rounded-[var(--radius-control)] px-2 text-xs text-ink-3 hover:bg-loss-tint hover:text-loss"
+        data-testid="lot-remove"
+      >
+        <Trash2 size={13} aria-hidden /> Remove
+      </button>
+    );
+  return (
+    <div className="mt-2 flex basis-full flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-loss/30 bg-loss-tint/40 px-3 py-2 text-xs" role="group" aria-label={`Remove ${label}`} data-testid="lot-remove-panel">
+      <span className="text-ink">Remove</span>
+      {remaining > 1 ? (
+        <span className="inline-flex items-center rounded-[var(--radius-control)] border border-rule bg-sheet">
+          <button type="button" className="grid size-7 place-items-center text-ink-2 hover:bg-hover disabled:opacity-40" disabled={n <= 1} onClick={() => setN((x) => Math.max(1, x - 1))} aria-label="Remove one fewer">
+            <Minus size={12} />
+          </button>
+          <span className="num w-7 text-center font-semibold" aria-live="polite" data-testid="lot-remove-qty">
+            {n}
+          </span>
+          <button type="button" className="grid size-7 place-items-center text-ink-2 hover:bg-hover disabled:opacity-40" disabled={n >= remaining} onClick={() => setN((x) => Math.min(remaining, x + 1))} aria-label="Remove one more">
+            <Plus size={12} />
+          </button>
+        </span>
+      ) : (
+        <span className="num font-semibold">1</span>
+      )}
+      <span className="text-ink-2">
+        of {remaining} from your collection? Not a sale — use Record sale if you sold {remaining === 1 ? "it" : "them"}.
+      </span>
+      <span className="ml-auto flex gap-1.5">
+        <Button
+          size="sm"
+          variant="danger"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              const r = await removeCopies({ lotId, quantity: n });
+              if (r.ok) {
+                setOpen(false);
+                router.refresh();
+              } else setMsg(r.message);
+            })
+          }
+          data-testid="lot-remove-confirm"
+        >
+          {pending ? "Removing…" : `Remove ${n}`}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+          Keep
+        </Button>
+      </span>
+      {msg && (
+        <p role="alert" className="basis-full text-loss">
+          {msg}
+        </p>
+      )}
+    </div>
   );
 }
 

@@ -19,7 +19,7 @@ import { LineChart } from "@/components/charts/LineChart";
 import { Delta, SourceStamp } from "@/components/money/Money";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/ui";
-import { Disclosure, LocalPriceForm, ManualPriceForm, MoveLotSelect } from "./PriceForms";
+import { Disclosure, LocalPriceForm, ManualPriceForm, MoveLotSelect, RemoveCopies } from "./PriceForms";
 import { AddToDeck } from "./AddToDeck";
 import { QuickAdd } from "./QuickAdd";
 import { suggestBinder } from "@/lib/collection/binderChoice";
@@ -508,8 +508,9 @@ export default async function CardPage({ params, searchParams }: { params: Promi
                             )}{" "}
                             · landed <span className="num">{formatMoney(Math.floor(l.landedTotal / l.quantity), l.currency)}</span> each
                           </p>
-                          <div className="mt-1.5">
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
                             <MoveLotSelect lotId={l.id} current={l.storageLocationId} locations={locations} />
+                            <RemoveCopies lotId={l.id} remaining={l.remainingQuantity} label={`${ART_LABEL[lv.art as VariantArt]} ${lv.finish === "FOIL" ? "foil" : "normal"} ${l.condition}`} />
                           </div>
                         </div>
                         <div className="text-right text-sm">

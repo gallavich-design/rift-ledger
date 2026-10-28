@@ -166,7 +166,7 @@ export function OrderForm({
                     label="Stored in"
                     value={l.storageLocationId}
                     onChange={(e) => update(l.key, { storageLocationId: e.target.value })}
-                    options={[{ value: "", label: "Unassigned" }, ...locations.map((x) => ({ value: x.id, label: x.name }))]}
+                    options={[{ value: "", label: "No binder" }, ...locations.map((x) => ({ value: x.id, label: x.name }))]}
                   />
                   {lines.length > 1 && (
                     <Button variant="ghost" size="sm" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} aria-label={`Remove card ${i + 1}`}>

@@ -108,7 +108,7 @@ export function OpenForm({
     >
       <section className="grid gap-4 rounded-[var(--radius-panel)] border border-rule bg-sheet p-4 sm:grid-cols-[160px_minmax(0,1fr)] sm:p-5">
         <TextField label="Opened on" type="date" value={openedOn} min={minDay} max={today} onChange={(e) => setOpenedOn(e.target.value)} />
-        <SelectField label="Put pulls in" value={loc} onChange={(e) => setLoc(e.target.value)} options={[{ value: "", label: "Unassigned" }, ...locations.map((l) => ({ value: l.id, label: l.name }))]} />
+        <SelectField label="Put pulls in" value={loc} onChange={(e) => setLoc(e.target.value)} options={[{ value: "", label: "No binder" }, ...locations.map((l) => ({ value: l.id, label: l.name }))]} />
       </section>
 
       <section aria-labelledby="pulls-h" className="rounded-[var(--radius-panel)] border border-rule bg-sheet p-4 sm:p-5">

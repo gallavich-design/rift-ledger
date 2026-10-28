@@ -131,7 +131,7 @@ export function SealedForm({ today, locations, defaultCurrency, products }: { to
           <MoneyField label="Price each" currency={currency} value={unitPrice} onChange={setUnitPrice} error={errors.unitPrice} />
           <MoneyField label="Shipping, forwarding & tax" optional currency={currency} value={extras} onChange={setExtras} error={errors.extras} hint="For the whole purchase" />
         </div>
-        <SelectField label="Stored in" value={loc} onChange={(e) => setLoc(e.target.value)} options={[{ value: "", label: "Unassigned" }, ...locations.map((l) => ({ value: l.id, label: l.name }))]} />
+        <SelectField label="Stored in" value={loc} onChange={(e) => setLoc(e.target.value)} options={[{ value: "", label: "No binder" }, ...locations.map((l) => ({ value: l.id, label: l.name }))]} />
       </section>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[var(--radius-panel)] border border-rule bg-sheet px-4 py-3 sm:px-5">
