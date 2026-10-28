@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FramedImage } from "@/components/cards/FramedImage";
 import { db } from "@/lib/db";
 import { getCurrentUserId, isDemoMode } from "@/lib/currentUser";
 import { getFx, getPriceBook, getSettings, missingRates } from "@/lib/portfolio/data";
@@ -178,10 +179,8 @@ export default async function BinderPage({ searchParams }: { searchParams: Promi
             <li key={s.variantIds[0]} className="min-w-0" data-owned={have ? "1" : "0"}>
               <Link href={`/cards/${s.cardId}?v=${s.variantIds[0]}`} className="group block">
                 <span className={cn("relative block aspect-[744/1039] overflow-hidden rounded-[var(--radius-art)] bg-inset", have ? "ring-1 ring-rule" : "border border-dashed border-rule-strong")}>
-                  {s.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.imageUrl} alt={s.name} loading="lazy" className={cn("absolute inset-0 h-full w-full", m.landscape ? "object-contain" : "object-cover", !have && "opacity-25 grayscale")} />
-                  )}
+                  {/* Binder pockets are upright: battlefields are turned to fill them, whichever way the source stores them. */}
+                  {s.imageUrl && <FramedImage src={s.imageUrl} alt={s.name} className={cn(!have && "opacity-25 grayscale")} />}
                   <span className="num absolute top-1.5 left-1.5 rounded-[3px] bg-sheet/95 px-1 text-[10px] text-ink-2">{String(s.number).padStart(3, "0")}</span>
                   {have && <span className="num absolute right-1.5 bottom-1.5 rounded-[3px] bg-sheet/95 px-1.5 text-[11px] font-medium">×{s.owned}</span>}
                 </span>

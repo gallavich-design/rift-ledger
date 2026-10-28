@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-28 — Battlefield pictures face the right way
+
+- Fixed: Radiance battlefields (e.g. Hunters' Circle RAD-163) showed sideways and cropped. Their pictures come from TCGplayer, which stores battlefields upright, while Riftcodex stores them landscape. Card pictures now check which way each image faces and turn it to fit the frame — on the deck view and pop-up, card browser, card page, collection, binder, watchlist and dashboard.
+- The deck image export now turns battlefields the same way as TCGplayer's upright form, so cards from both sources face the same way in the exported list.
+
 ## 2026-10-28 — Chosen Champion beside the Legend
 
 - In the Cards view the Chosen Champion now has its own spot to the right of the Legend (Legend · Champion · Runes). It still counts toward the main deck, which reads "40/40 incl. Chosen Champion".

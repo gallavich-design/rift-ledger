@@ -28,7 +28,9 @@ async function cardArt(url: string | null, width: number): Promise<string | null
     const input = Buffer.from(await res.arrayBuffer());
     const meta = await sharp(input).metadata();
     let img = sharp(input);
-    if ((meta.width ?? 0) > (meta.height ?? 0)) img = img.rotate(90);
+    // Turn anticlockwise (name along the right edge) — the way TCGplayer already stores battlefields
+    // upright, so cards from either source face the same way.
+    if ((meta.width ?? 0) > (meta.height ?? 0)) img = img.rotate(-90);
     const buf = await img.resize({ width: width * 2 }).jpeg({ quality: 82 }).toBuffer();
     return `data:image/jpeg;base64,${buf.toString("base64")}`;
   } catch {

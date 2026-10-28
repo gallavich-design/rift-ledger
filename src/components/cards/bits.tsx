@@ -1,5 +1,6 @@
 import { domainColor } from "@/config/domains";
 import { cn } from "@/lib/ui";
+import { FramedImage } from "./FramedImage";
 
 /** Signature element: a printing's ticker, e.g. OGN·174. */
 export function Ticker({ setCode, number, className }: { setCode: string; number: number | null; className?: string }) {
@@ -57,14 +58,8 @@ export function CardArt({
     >
       {src ? (
         // Upstream images are already sized for the web; next/image optimisation is off (next.config.ts).
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt={alt}
-          loading={priority ? "eager" : "lazy"}
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+        // FramedImage turns sideways/upright sources to match the frame (TCGplayer battlefields are upright).
+        <FramedImage src={src} alt={alt} landscape={landscape} loading={priority ? "eager" : "lazy"} />
       ) : (
         <span className="absolute inset-0 grid place-items-center text-xs text-ink-3">No image</span>
       )}
