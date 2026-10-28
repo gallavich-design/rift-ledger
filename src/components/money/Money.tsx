@@ -38,8 +38,9 @@ export function Delta({
   );
 }
 
+const STAMP = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 export function formatStamp(d: Date): string {
-  return d.toLocaleString("en-GB", { timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return STAMP.format(d);
 }
 
 /** "TCGplayer market · 26 Oct, 03:05" — every price shows its source and when it was updated (spec §0.4). */

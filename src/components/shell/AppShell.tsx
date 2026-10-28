@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MoreHorizontal, Search } from "lucide-react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { cn } from "@/lib/ui";
 import { CURRENT_PHASE, NAV } from "./nav";
 import { CommandPalette } from "./CommandPalette";
 import { DemoBanner } from "./DemoBanner";
+import { NavProgress } from "./NavProgress";
 
 export function AppShell({ children, demo = false, unread = 0 }: { children: React.ReactNode; demo?: boolean; unread?: number }) {
   const pathname = usePathname();
@@ -24,6 +25,9 @@ export function AppShell({ children, demo = false, unread = 0 }: { children: Rea
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)]">
+      <Suspense fallback={null}>
+        <NavProgress />
+      </Suspense>
       {/* Desktop rail — same canvas as content, separated by a rule */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r border-rule md:flex">
         <div className="flex h-14 items-center gap-2 px-5">

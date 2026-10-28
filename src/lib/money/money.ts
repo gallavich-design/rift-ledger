@@ -28,6 +28,10 @@ export function decimalToMinor(x: number | null | undefined): number | null {
   return Math.round(x * 100);
 }
 
+// Reused formatters: toLocaleString with options builds a new formatter on every call.
+const TWO_DP = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+
 export function formatMoney(
   amount: number,
   currency: string,
@@ -37,8 +41,8 @@ export function formatMoney(
   const sym = SYMBOL[currency] ?? `${currency} `;
   const body =
     opts.compact && abs >= 10_000
-      ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(abs)
-      : abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      ? COMPACT.format(abs)
+      : TWO_DP.format(abs);
   const sign = amount < 0 ? "−" : opts.sign && amount > 0 ? "+" : "";
   return `${sign}${sym}${body}`;
 }

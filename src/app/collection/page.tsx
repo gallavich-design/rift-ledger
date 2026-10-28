@@ -13,12 +13,16 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { FxMissing } from "@/components/money/FxMissing";
 import { cn } from "@/lib/ui";
+import { normalizeForSearch } from "@/lib/catalog/grouping";
 import { CollectionTabs } from "./CollectionTabs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Collection" };
 
-type SP = { location?: string; set?: string; sort?: string };
+type SP = { location?: string; set?: string; sort?: string; q?: string; page?: string };
+
+/** Rows per page — keeps the page light on a phone however big the collection is. */
+const PAGE_SIZE = 50;
 
 export default async function CollectionPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
@@ -60,6 +64,8 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
     settings.conditionMultipliers,
   );
   if (sp.set) positions = positions.filter((p) => info.get(p.variantId)?.setCode === sp.set);
+  const query = normalizeForSearch(sp.q ?? "");
+  if (query) positions = positions.filter((p) => normalizeForSearch(info.get(p.variantId)?.name ?? "").includes(query));
   const sort = sp.sort ?? "value";
   positions.sort((a, b) =>
     sort === "name"
@@ -68,13 +74,17 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
         ? (b.plPct ?? -Infinity) - (a.plPct ?? -Infinity)
         : (b.value ?? -1) - (a.value ?? -1),
   );
-  const totals = computeTotals(positions, sp.location || sp.set ? [] : saleInputs, fx.table, display);
+  const totals = computeTotals(positions, sp.location || sp.set || query ? [] : saleInputs, fx.table, display);
+  const pages = Math.max(1, Math.ceil(positions.length / PAGE_SIZE));
+  const page = Math.min(pages, Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1));
+  const pageItems = positions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const lotsByVariant = new Map<string, typeof openLots>();
   for (const l of openLots) if (filteredIds.has(l.id)) lotsByVariant.set(l.variantId, [...(lotsByVariant.get(l.variantId) ?? []), l]);
 
   const href = (patch: Partial<SP>) => {
     const p = new URLSearchParams();
-    for (const [k, v] of Object.entries({ ...sp, ...patch })) if (v) p.set(k, v);
+    // any filter change goes back to page 1
+    for (const [k, v] of Object.entries({ ...sp, page: undefined, ...patch })) if (v && !(k === "page" && v === "1")) p.set(k, v);
     const s = p.toString();
     return s ? `/collection?${s}` : "/collection";
   };
@@ -106,6 +116,13 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
           <div className="mt-4 flex flex-wrap gap-2">
             <Filter label="Stored in" current={sp.location} options={[["", "Anywhere"], ...locations.map((l) => [l.id, l.name] as [string, string]), ["none", "Unassigned"]]} href={(v) => href({ location: v || undefined })} />
             <Filter label="Set" current={sp.set} options={[["", "All sets"], ...setCodes.map((c) => [c, c] as [string, string])]} href={(v) => href({ set: v || undefined })} />
+            <form action="/collection" className="flex h-8 items-center rounded-full border border-rule bg-sheet pr-1 pl-3 text-[13px] focus-within:border-quill" role="search">
+              {Object.entries(sp).map(([k, v]) => (k !== "q" && k !== "page" && v ? <input key={k} type="hidden" name={k} value={v} /> : null))}
+              <label htmlFor="col-q" className="sr-only">
+                Find a card in your collection
+              </label>
+              <input id="col-q" name="q" defaultValue={sp.q ?? ""} placeholder="Find a card" className="w-32 bg-transparent outline-none placeholder:text-ink-4 sm:w-44" />
+            </form>
             <Filter label="Sort" current={sort} options={[["value", "Value"], ["pl", "Gain %"], ["name", "Name"]]} href={(v) => href({ sort: v === "value" ? undefined : v })} />
           </div>
 
@@ -120,7 +137,7 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
                 <span className="text-right">Value</span>
                 <span className="text-right">Gain / loss</span>
               </li>
-              {positions.map((p) => {
+              {pageItems.map((p) => {
                 const v = info.get(p.variantId)!;
                 const pl = lotsByVariant.get(p.variantId) ?? [];
                 const where = [...new Set(pl.map((l) => (l.storageLocationId ? locName.get(l.storageLocationId) : "Unassigned")))];
@@ -177,6 +194,44 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
               })}
             </ul>
           )}
+          {pages > 1 && (
+            <nav aria-label="Pages" className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm" data-testid="collection-pages">
+              <span className="text-ink-3">
+                <span className="num">
+                  {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, positions.length)}
+                </span>{" "}
+                of <span className="num">{positions.length}</span> printings
+              </span>
+              <span className="flex flex-wrap items-center gap-1">
+                {page > 1 && (
+                  <Link href={href({ page: String(page - 1) })} className="inline-flex h-8 items-center rounded-[var(--radius-control)] border border-rule bg-sheet px-3 hover:border-rule-strong" rel="prev">
+                    ← Previous
+                  </Link>
+                )}
+                {pageList(page, pages).map((n, i) =>
+                  n === 0 ? (
+                    <span key={`gap${i}`} className="px-1 text-ink-3">
+                      …
+                    </span>
+                  ) : (
+                    <Link
+                      key={n}
+                      href={href({ page: String(n) })}
+                      aria-current={n === page ? "page" : undefined}
+                      className={cn("num inline-flex h-8 min-w-8 items-center justify-center rounded-[var(--radius-control)] border px-2", n === page ? "border-quill bg-quill-tint font-medium text-quill" : "border-rule bg-sheet hover:border-rule-strong")}
+                    >
+                      {n}
+                    </Link>
+                  ),
+                )}
+                {page < pages && (
+                  <Link href={href({ page: String(page + 1) })} className="inline-flex h-8 items-center rounded-[var(--radius-control)] border border-rule bg-sheet px-3 hover:border-rule-strong" rel="next">
+                    Next →
+                  </Link>
+                )}
+              </span>
+            </nav>
+          )}
           {totals.unpricedPositions > 0 && (
             <p className="mt-2 text-xs text-ink-3">
               <span className="num">{totals.unpricedPositions}</span> {totals.unpricedPositions === 1 ? "printing has" : "printings have"} no {SOURCE_LABEL[source]} price — they count toward cost but not value.
@@ -207,6 +262,17 @@ function Shell({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
+}
+
+/** 1 … 4 5 [6] 7 8 … 20 — 0 marks a gap. */
+function pageList(page: number, pages: number): number[] {
+  const keep = new Set([1, pages, page - 2, page - 1, page, page + 1, page + 2].filter((n) => n >= 1 && n <= pages));
+  const out: number[] = [];
+  for (const n of [...keep].sort((a, b) => a - b)) {
+    if (out.length && n - out[out.length - 1] > 1) out.push(0);
+    out.push(n);
+  }
+  return out;
 }
 
 function Filter({ label, current, options, href }: { label: string; current?: string; options: [string, string][]; href: (v: string) => string }) {

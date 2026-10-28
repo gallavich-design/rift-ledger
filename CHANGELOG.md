@@ -1,5 +1,19 @@
 # Changelog
 
+## Speed-ups (2026-10-28)
+
+No schema changes.
+
+- Date and money formatting reuse their formatters instead of building new ones on every call
+  (`dayKey`, `formatMoney`, price stamps, report formatting). Loading a 900-card collection's lots
+  went from ~120 ms to ~25 ms, and its card details from ~185 ms to ~60 ms.
+- Collection list is paged (50 printings a page) with a "Find a card" box; totals still cover every
+  matching card. A 900-printing collection page went from 2.7 MB / 1.6 s to ~170 KB / 0.2 s.
+- A thin progress bar appears the moment you click a link, so a slow page never looks like a dead click.
+- E2E: price fixtures are re-dated to "today" so the suite doesn't depend on when dev.db was synced;
+  extra test servers are stopped with their whole process group.
+
+
 ## After Phase 5 — sign-in, bulk import, deploy (2026-10-26)
 
 No schema changes.

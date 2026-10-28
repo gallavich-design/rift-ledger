@@ -18,6 +18,20 @@ async function main() {
     await db.priceSnapshot.deleteMany({ where: { source: { in: ["DEMO", "MANUAL"] } } });
     const n = await db.priceSnapshot.count({ where: { source: "TCGPLAYER" } });
     if (!n) throw new Error("No TCGplayer prices in dev.db — run npm run sync:prices first.");
+    // Tests reason about "today" and "yesterday": keep only the newest day of prices and file it under
+    // today, so results don't depend on when dev.db was last synced.
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
+    for (const model of ["priceSnapshot", "sealedPriceSnapshot"] as const) {
+      const m = db[model] as unknown as {
+        findFirst(a: object): Promise<{ day: string } | null>;
+        deleteMany(a: object): Promise<unknown>;
+        updateMany(a: object): Promise<unknown>;
+      };
+      const newest = (await m.findFirst({ where: { source: "TCGPLAYER" }, orderBy: { day: "desc" }, select: { day: true } }))?.day;
+      if (!newest) continue;
+      await m.deleteMany({ where: { day: { not: newest } } });
+      if (newest !== today) await m.updateMany({ where: { day: newest }, data: { day: today } });
+    }
   } finally {
     await db.$disconnect();
   }

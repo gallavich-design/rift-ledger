@@ -100,3 +100,34 @@ body {
 .rules p + p {
   margin-top: 0.5rem;
 }
+
+/* Navigation progress bar (components/shell/NavProgress.tsx). */
+.nav-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  height: 2px;
+  background: var(--quill);
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+  pointer-events: none;
+}
+.nav-progress[data-active="1"] {
+  opacity: 1;
+  animation: nav-progress 8s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+}
+@keyframes nav-progress {
+  from {
+    transform: scaleX(0.05);
+  }
+  to {
+    transform: scaleX(0.92);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress[data-active="1"] {
+    animation: none;
+    transform: scaleX(0.6);
+  }
+}

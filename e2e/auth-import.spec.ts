@@ -9,8 +9,19 @@ test.afterAll(() => db.$disconnect());
 
 const ROOT = path.resolve(__dirname, "..");
 
+/** Stops `npx next start` and the next-server it spawned (the whole process group). */
+function stop(child: ChildProcess) {
+  try {
+    process.kill(-child.pid!, "SIGTERM");
+  } catch {
+    child.kill();
+  }
+}
+
 async function startServer(port: number, env: Record<string, string>): Promise<ChildProcess> {
-  const child = spawn("npx", ["next", "start", "-p", String(port)], { cwd: ROOT, env: { ...process.env, DATABASE_URL: E2E_DB_URL, APP_PASSWORD: "", RIFT_LEDGER_OPEN: "", ...env }, stdio: "ignore" });
+  const busy = await fetch(`http://localhost:${port}/manifest.webmanifest`).then(() => true, () => false);
+  if (busy) throw new Error(`port ${port} is already in use — stop the old server first`);
+  const child = spawn("npx", ["next", "start", "-p", String(port)], { cwd: ROOT, env: { ...process.env, DATABASE_URL: E2E_DB_URL, APP_PASSWORD: "", RIFT_LEDGER_OPEN: "", ...env }, stdio: "ignore", detached: true });
   for (let i = 0; i < 60; i++) {
     try {
       await fetch(`http://localhost:${port}/manifest.webmanifest`);
@@ -19,7 +30,7 @@ async function startServer(port: number, env: Record<string, string>): Promise<C
       await new Promise((r) => setTimeout(r, 250));
     }
   }
-  child.kill();
+  stop(child);
   throw new Error(`server on ${port} didn't start`);
 }
 
@@ -117,8 +128,8 @@ test("Sign-in gate: password required, share links stay public, no password → 
     expect(await r.text()).toContain("Set APP_PASSWORD");
     expect((await fetch("http://localhost:3102/share/trade/e2e-share-token")).status).toBe(200);
   } finally {
-    locked.kill();
-    open.kill();
+    stop(locked);
+    stop(open);
     await db.settings.update({ where: { userId: owner.id }, data: { tradeShareToken: null } }); // leave sharing off for later specs
   }
 });

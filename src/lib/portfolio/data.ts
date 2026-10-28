@@ -198,7 +198,16 @@ export async function loadLotsAndSales(db: PrismaClient, userId: string) {
 export async function loadVariantInfo(db: PrismaClient, variantIds: string[]) {
   const vs = await db.cardVariant.findMany({
     where: { id: { in: variantIds } },
-    include: {
+    select: {
+      id: true,
+      collectorNumber: true,
+      rarity: true,
+      art: true,
+      finish: true,
+      language: true,
+      gradingCompany: true,
+      grade: true,
+      imageUrl: true,
       card: { select: { id: true, name: true, domains: true, type: true, orientation: true, set: { select: { code: true, rotatesOn: true } } } },
       set: { select: { code: true, name: true, rotatesOn: true } },
     },
