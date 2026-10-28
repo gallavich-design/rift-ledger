@@ -93,7 +93,7 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
     <Shell>
       <CollectionTabs active="positions" />
       {lots.length === 0 ? (
-        <EmptyState title="Your collection is empty" body="Add your first order — or import a list or spreadsheet of cards you already have." action={{ href: "/collection/import", label: "Import cards" }} />
+        <EmptyState title="Your collection is empty" body="Tick off the cards you already own set by set — or import a list or spreadsheet, or add a purchase." action={{ href: "/collection/binder?edit=1", label: "Add cards I own" }} />
       ) : (
         <>
           <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
@@ -249,12 +249,15 @@ function Shell({ children }: { children: React.ReactNode }) {
       <PageHeader
         title="Collection"
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button asChild variant="secondary">
               <Link href="/collection/import">Import</Link>
             </Button>
-            <Button asChild>
+            <Button asChild variant="secondary">
               <Link href="/collection/add">Add purchase</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/collection/binder?edit=1">Add cards I own</Link>
             </Button>
           </div>
         }

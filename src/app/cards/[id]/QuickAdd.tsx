@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, PlusCircle } from "lucide-react";
 import { CONDITIONS, type Condition } from "@/lib/domain/enums";
 import { formatMoney } from "@/lib/money/money";
 import { Button } from "@/components/ui/Button";
+import { AddedResult } from "@/components/collection/AddedResult";
 import { Segmented, TextField } from "@/components/ui/fields";
 import { BinderPicker, type BinderValue, type LocationOption } from "@/components/collection/BinderPicker";
 import { quickAddToCollection } from "@/app/collection/actions";
@@ -42,7 +42,7 @@ export function QuickAdd({
   const [binder, setBinder] = useState<BinderValue>(defaultBinder);
   const [cost, setCost] = useState<"market" | "zero">("market");
   const [acquiredOn, setAcquiredOn] = useState(today);
-  const [result, setResult] = useState<{ ok: boolean; text: string; orderId?: string } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; text: string; lotIds?: string[] } | null>(null);
 
   return (
     <>
@@ -56,21 +56,12 @@ export function QuickAdd({
       >
         <PlusCircle size={15} aria-hidden /> Add to collection
       </Button>
-      {result?.ok && !open && (
-        <p role="status" className="basis-full text-sm text-gain" data-testid="quick-add-result">
-          {result.text}{" "}
-          {result.orderId && (
-            <Link href={`/collection/orders/${result.orderId}`} className="text-quill hover:underline">
-              View or undo
-            </Link>
-          )}
-        </p>
-      )}
+      {result?.ok && <AddedResult text={result.text} lotIds={result.lotIds ?? []} testid="quick-add-result" />}
       {open && (
         <section className="basis-full space-y-4 rounded-[var(--radius-panel)] border border-rule bg-sheet p-4" aria-label="Add to collection" data-testid="quick-add-panel">
           <p className="text-sm text-ink-2">
             Adding <span className="font-medium text-ink">{cardName}</span> · {printingLabel}
-            <span className="block text-xs text-ink-3">Pick another printing above to add that one instead.</span>
+            <span className="block text-xs text-ink-3">For copies you already have — pulled from packs, traded or owned from before. Pick another printing above to add that one instead.</span>
           </p>
           <div className="flex flex-wrap items-end gap-5">
             <div>
@@ -102,16 +93,16 @@ export function QuickAdd({
             <TextField label="Owned since" type="date" value={acquiredOn} max={today} onChange={(e) => setAcquiredOn(e.target.value)} />
           </div>
           <Segmented
-            label="Cost basis"
+            label="Track value from"
             name={`qa-cost-${variantId}`}
             value={cost}
             onChange={setCost}
             options={[
-              { value: "market", label: market != null ? `Market · ${formatMoney(market * qty, currency)}` : "Market (no price → 0)" },
-              { value: "zero", label: "Don't record" },
+              { value: "market", label: market != null ? `Today's price · ${formatMoney(market * qty, currency)}` : "Today's price (none yet → 0)" },
+              { value: "zero", label: "No cost" },
             ]}
           />
-          <p className="text-xs text-ink-3">Saved as its own small order, so you can undo it from Orders. Use “Add purchase” instead to record what you paid, the seller and shipping.</p>
+          <p className="text-xs text-ink-3">“Today&rsquo;s price” starts your gain/loss at zero today, so you see how the value moves from here. “No cost” counts the whole value as gain. Not a purchase — use “Add purchase” to record what you paid.</p>
           {result && !result.ok && (
             <p role="alert" className="text-sm text-loss">
               {result.text}
@@ -124,7 +115,7 @@ export function QuickAdd({
                 start(async () => {
                   const r = await quickAddToCollection({ variantId, quantity: qty, condition, cost, binder, acquiredOn });
                   if (r.ok) {
-                    setResult({ ok: true, text: r.message ?? "Added.", orderId: r.data.orderId });
+                    setResult({ ok: true, text: r.message ?? "Added.", lotIds: r.data.lotIds });
                     setOpen(false);
                     setQty(1);
                     router.refresh();

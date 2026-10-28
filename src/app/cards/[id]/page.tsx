@@ -22,6 +22,7 @@ import { cn } from "@/lib/ui";
 import { Disclosure, LocalPriceForm, ManualPriceForm, MoveLotSelect, RemoveCopies } from "./PriceForms";
 import { AddToDeck } from "./AddToDeck";
 import { QuickAdd } from "./QuickAdd";
+import { isAlreadyOwned } from "@/lib/collection/owned";
 import { suggestBinder } from "@/lib/collection/binderChoice";
 import { quoteVariants } from "@/lib/prices/quote";
 import { WatchForm } from "./WatchForm";
@@ -496,17 +497,32 @@ export default async function CardPage({ params, searchParams }: { params: Promi
                             <span className="num font-medium">{l.remainingQuantity}×</span> {ART_LABEL[lv.art as VariantArt]} · {lv.finish === "FOIL" ? "Foil" : "Normal"} · {l.condition}
                           </p>
                           <p className="mt-0.5 text-xs text-ink-3">
-                            Bought <span className="num">{dayKey(l.acquiredOn)}</span>
-                            {l.order && (
+                            {isAlreadyOwned(l) ? (
                               <>
-                                {" "}
-                                from{" "}
-                                <Link href={`/collection/orders/${l.order.id}`} className="hover:text-quill hover:underline">
-                                  {l.order.seller}
-                                </Link>
+                                Already owned · since <span className="num">{dayKey(l.acquiredOn)}</span> ·{" "}
+                                {l.landedTotal > 0 ? (
+                                  <>
+                                    value tracked from <span className="num">{formatMoney(Math.floor(l.landedTotal / l.quantity), l.currency)}</span> each
+                                  </>
+                                ) : (
+                                  "no cost recorded"
+                                )}
                               </>
-                            )}{" "}
-                            · landed <span className="num">{formatMoney(Math.floor(l.landedTotal / l.quantity), l.currency)}</span> each
+                            ) : (
+                              <>
+                                {l.packOpeningId ? "Pulled" : "Bought"} <span className="num">{dayKey(l.acquiredOn)}</span>
+                                {l.order && (
+                                  <>
+                                    {" "}
+                                    from{" "}
+                                    <Link href={`/collection/orders/${l.order.id}`} className="hover:text-quill hover:underline">
+                                      {l.order.seller}
+                                    </Link>
+                                  </>
+                                )}{" "}
+                                · landed <span className="num">{formatMoney(Math.floor(l.landedTotal / l.quantity), l.currency)}</span> each
+                              </>
+                            )}
                           </p>
                           <div className="mt-1.5 flex flex-wrap items-center gap-2">
                             <MoveLotSelect lotId={l.id} current={l.storageLocationId} locations={locations} />

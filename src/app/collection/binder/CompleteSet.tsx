@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import Link from "next/link";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LibraryBig } from "lucide-react";
 import { formatMoney } from "@/lib/money/money";
 import { Button } from "@/components/ui/Button";
+import { AddedResult } from "@/components/collection/AddedResult";
 import { Segmented, TextField } from "@/components/ui/fields";
 import { BinderPicker, type BinderValue, type LocationOption } from "@/components/collection/BinderPicker";
 import { completeSet } from "../actions";
@@ -46,8 +46,13 @@ export function CompleteSet({
   const [cost, setCost] = useState<"market" | "zero">("market");
   const [moveOwned, setMoveOwned] = useState(false);
   const [acquiredOn, setAcquiredOn] = useState(today);
-  const [result, setResult] = useState<{ ok: boolean; text: string; orderId?: string | null } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; text: string; lotIds?: string[] } | null>(null);
   const checklist = scope === "all" ? "every printing" : "the base set";
+  // Your binders can change (e.g. the one just created): while closed, follow the suggestion.
+  const suggestion = JSON.stringify(defaultBinder);
+  useEffect(() => {
+    if (!open) setBinder(JSON.parse(suggestion) as BinderValue);
+  }, [suggestion, open]);
   const hasBinder = !("none" in binder);
 
   if (!open)
@@ -67,16 +72,7 @@ export function CompleteSet({
         ) : (
           <p className="text-sm text-gain">You have every card in {checklist}.</p>
         )}
-        {result?.ok && (
-          <p role="status" className="text-sm text-gain" data-testid="complete-set-result">
-            {result.text}{" "}
-            {result.orderId && (
-              <Link href={`/collection/orders/${result.orderId}`} className="text-quill hover:underline">
-                View or undo
-              </Link>
-            )}
-          </p>
-        )}
+        {result?.ok && <AddedResult text={result.text} lotIds={result.lotIds ?? []} testid="complete-set-result" />}
       </div>
     );
 
@@ -99,17 +95,17 @@ export function CompleteSet({
         </label>
       )}
       <Segmented
-        label="Cost basis"
+        label="Track value from"
         name={`cs-cost-${setCode}`}
         value={cost}
         onChange={setCost}
         options={[
-          { value: "market", label: `Market · ${formatMoney(marketTotal, currency)}` },
-          { value: "zero", label: "Don't record" },
+          { value: "market", label: `Today's price · ${formatMoney(marketTotal, currency)}` },
+          { value: "zero", label: "No cost" },
         ]}
       />
       {cost === "market" && unpriced > 0 && <p className="text-xs text-caution">{unpriced} without a price will cost 0.</p>}
-      <p className="text-xs text-ink-3">Each card is added once, in its normal finish where it has one, condition NM. It&rsquo;s saved as one order you can delete to undo.</p>
+      <p className="text-xs text-ink-3">Each card is added once, in its normal finish where it has one, condition NM. Recorded as cards you already own, not a purchase — you can undo it straight after.</p>
       {result && !result.ok && (
         <p role="alert" className="text-sm text-loss">
           {result.text}
@@ -122,7 +118,7 @@ export function CompleteSet({
             start(async () => {
               const r = await completeSet({ setCode, scope, cost, binder, moveOwned: moveOwned && hasBinder, acquiredOn });
               if (r.ok) {
-                setResult({ ok: true, text: r.message ?? "Done.", orderId: r.data.orderId });
+                setResult({ ok: true, text: r.message ?? "Done.", lotIds: r.data.lotIds });
                 setOpen(false);
                 router.refresh();
               } else setResult({ ok: false, text: r.message });

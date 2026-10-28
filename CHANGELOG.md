@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-28 — Record the cards you already own (not purchases)
+
+No schema changes.
+
+- **Edit what I own** in the Set binder (also **Add cards I own** at the top of Collection): pick the binder new copies go in, then tap each card you have (+1 per tap, or − / +), find cards by name or number, filter All / Missing / Owned, and save once. Lowering a count removes copies — from that binder first, newest first.
+- **Add to collection** (card page) and **Complete the set** now record cards you already own — pulled, traded or from before — with no order or seller, like pack pulls. The confirmation has an **Undo** that takes back exactly what was just added. "Add purchase" is still there for real purchases.
+- **Track value from**: "Today's price" (default) starts gain/loss at zero today so you see how value moves from here; "No cost" counts the full value as gain.
+- Card page → Your copies says "Already owned · since …" for these, and "Pulled" for pack pulls.
+
 ## 2026-10-28 — Take cards out of a binder, or remove them
 
 - Card page → Your copies: each row now has a labelled **Binder** picker — choose **No binder** to take the copies out of their binder (they stay in your collection) — and a **Remove** button that takes unsold copies out of your collection (pick how many; asks first). Removed copies take their share of the cost with them; recorded sales are untouched; an order left empty is deleted.
