@@ -6,7 +6,6 @@ import { Copy, Download, ImageDown, Link2, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SelectField, TextField } from "@/components/ui/fields";
 import { cn } from "@/lib/ui";
-import { SECTION_LABEL, SECTIONS, type Section } from "@/lib/decks/types";
 import type { UnrecognizedLine } from "@/lib/decks/resolve";
 import { deleteDeck, deleteMatch, logMatch, resolveImportLine, restoreVersion, setSharing } from "../actions";
 
@@ -238,19 +237,14 @@ export function DeleteMatchButton({ matchId }: { matchId: string }) {
 
 // ───────────────────────────── export & share ─────────────────────────────
 
-export interface ImageLine {
-  section: Section;
-  quantity: number;
-  name: string;
-  energy: number | null;
-}
-
-export function ExportShare({ deckId, deckName, shareToken, imageLines, legal }: { deckId: string; deckName: string; shareToken: string | null; imageLines: ImageLine[]; legal: boolean }) {
+export function ExportShare({ deckId, deckName, shareToken }: { deckId: string; deckName: string; shareToken: string | null }) {
   const router = useRouter();
   const [token, setToken] = useState(shareToken);
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, start] = useTransition();
+  const [imaging, setImaging] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
   const shareUrl = token && typeof window !== "undefined" ? `${window.location.origin}/share/deck/${token}` : null;
 
   return (
@@ -266,10 +260,42 @@ export function ExportShare({ deckId, deckName, shareToken, imageLines, legal }:
             <Download size={14} aria-hidden /> CSV
           </a>
         </Button>
-        <Button variant="secondary" size="sm" onClick={() => downloadImage(deckName, imageLines, legal)}>
-          <ImageDown size={14} aria-hidden /> Image
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={imaging}
+          data-testid="export-image"
+          onClick={async () => {
+            // Drawn on the server (card art from other sites can't be exported from a browser canvas).
+            setImaging(true);
+            setImageError(null);
+            try {
+              const res = await fetch(`/decks/${deckId}/image`);
+              if (!res.ok) throw new Error();
+              const url = URL.createObjectURL(await res.blob());
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `${deckName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") || "deck"}.png`;
+              a.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            } catch {
+              setImageError("Couldn't make the image — try again.");
+            } finally {
+              setImaging(false);
+            }
+          }}
+        >
+          <ImageDown size={14} aria-hidden /> {imaging ? "Making image…" : "Image"}
         </Button>
+        <a href={`/decks/${deckId}/image`} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center px-1 text-[13px] text-quill hover:underline">
+          Preview
+        </a>
       </div>
+      {imageError && (
+        <p role="alert" className="text-xs text-loss">
+          {imageError}
+        </p>
+      )}
       <div>
         {token ? (
           <div className="space-y-2">
@@ -347,78 +373,4 @@ export function ExportShare({ deckId, deckName, shareToken, imageLines, legal }:
       </div>
     </div>
   );
-}
-
-/** Draws the list onto a canvas in the app's light ledger style and downloads it as PNG. */
-function downloadImage(deckName: string, lines: ImageLine[], legal: boolean) {
-  const sections = SECTIONS.map((s) => ({ s, ls: lines.filter((l) => l.section === s).sort((a, b) => (a.energy ?? 99) - (b.energy ?? 99) || a.name.localeCompare(b.name)) })).filter((x) => x.ls.length);
-  const W = 1080;
-  const pad = 56;
-  const row = 34;
-  const colW = (W - pad * 2 - 40) / 2;
-  // two columns: Legend/Champion/Runes/Battlefields left, Main/Sideboard right
-  const left = sections.filter((x) => !["MAIN", "SIDEBOARD"].includes(x.s));
-  const right = sections.filter((x) => ["MAIN", "SIDEBOARD"].includes(x.s));
-  const colHeight = (cols: typeof sections) => cols.reduce((h, x) => h + 44 + x.ls.length * row + 16, 0);
-  const H = pad * 2 + 110 + Math.max(colHeight(left), colHeight(right));
-  const dpr = 2;
-  const canvas = document.createElement("canvas");
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  const ctx = canvas.getContext("2d")!;
-  ctx.scale(dpr, dpr);
-  const css = getComputedStyle(document.documentElement);
-  const sans = css.getPropertyValue("--font-plex-sans") || "sans-serif";
-  const mono = css.getPropertyValue("--font-plex-mono") || "monospace";
-  ctx.fillStyle = "#fbfaf7";
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#16181d";
-  ctx.font = `600 34px ${sans}`;
-  ctx.fillText(deckName, pad, pad + 30);
-  ctx.font = `400 16px ${sans}`;
-  ctx.fillStyle = legal ? "#0b7a43" : "#b42318";
-  ctx.fillText(legal ? "✓ Legal in Standard" : "✕ Not legal yet", pad, pad + 62);
-  ctx.fillStyle = "#626873";
-  ctx.fillText(`Rift Ledger · ${new Date().toLocaleDateString("en-GB", { dateStyle: "medium" })}`, pad + 200, pad + 62);
-  const drawCol = (cols: typeof sections, x: number) => {
-    let y = pad + 110;
-    for (const { s, ls } of cols) {
-      const total = ls.reduce((a, l) => a + l.quantity, 0);
-      ctx.fillStyle = "#626873";
-      ctx.font = `500 13px ${sans}`;
-      ctx.fillText(`${SECTION_LABEL[s].toUpperCase()}  ·  ${total}`, x, y);
-      ctx.strokeStyle = "rgba(22,24,29,0.12)";
-      ctx.beginPath();
-      ctx.moveTo(x, y + 10);
-      ctx.lineTo(x + colW, y + 10);
-      ctx.stroke();
-      y += 36;
-      for (const l of ls) {
-        ctx.fillStyle = "#16181d";
-        ctx.font = `500 17px ${mono}`;
-        ctx.fillText(`${l.quantity}`, x, y);
-        ctx.font = `400 17px ${sans}`;
-        ctx.fillText(l.name.length > 38 ? l.name.slice(0, 37) + "…" : l.name, x + 30, y);
-        if (l.energy != null) {
-          ctx.fillStyle = "#626873";
-          ctx.font = `400 14px ${mono}`;
-          ctx.textAlign = "right";
-          ctx.fillText(String(l.energy), x + colW, y);
-          ctx.textAlign = "left";
-        }
-        y += row;
-      }
-      y += 16;
-    }
-  };
-  drawCol(left, pad);
-  drawCol(right, pad + colW + 40);
-  canvas.toBlob((b) => {
-    if (!b) return;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(b);
-    a.download = `${deckName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") || "deck"}.png`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }, "image/png");
 }

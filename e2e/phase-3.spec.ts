@@ -128,6 +128,12 @@ test("decks list, share link and text export work", async ({ page }) => {
   await expect(shared.locator("main")).not.toContainText("฿");
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Text" }).click()]);
   expect(download.suggestedFilename()).toBe("E2E-Test-Deck.txt");
+  // Image: the card-grid PNG, made on the server
+  const [png] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), page.getByTestId("export-image").click()]);
+  expect(png.suggestedFilename()).toBe("E2E-Test-Deck.png");
+  const bytes = await (await import("node:fs/promises")).readFile((await png.path())!);
+  expect(bytes.subarray(1, 4).toString()).toBe("PNG");
+  expect(bytes.readUInt32BE(16)).toBe(1080); // width from the IHDR chunk
 });
 
 test.describe("phone width", () => {

@@ -7,7 +7,6 @@ import { dayKey } from "@/config/app";
 import { getFx, getPriceSeries, getSettings, missingRates, seriesDays } from "@/lib/portfolio/data";
 import { priceOn } from "@/lib/portfolio/compute";
 import { deckLinesFromRows, loadBannedNames, loadDeckCards, loadDeckPricing, loadOwned } from "@/lib/decks/data";
-import { validateDeck } from "@/lib/decks/validate";
 import { formatDiff, type DiffEntry } from "@/lib/decks/diff";
 import { winRates } from "@/lib/decks/winrate";
 import type { UnrecognizedLine } from "@/lib/decks/resolve";
@@ -59,7 +58,6 @@ export default async function DeckPage({ params }: { params: Promise<{ id: strin
     loadBannedNames(db),
     db.card.findMany({ where: { type: "Legend" }, select: { name: true }, orderBy: { name: "asc" } }),
   ]);
-  const validation = validateDeck(lines, cards, { today, bannedNames: banned });
   const pending: UnrecognizedLine[] = JSON.parse(deck.pendingImportLines);
 
   // Price history of the whole deck: chosen (or default) printing of every card × copies, per price day.
@@ -230,8 +228,6 @@ export default async function DeckPage({ params }: { params: Promise<{ id: strin
               deckId={deck.id}
               deckName={deck.name}
               shareToken={deck.shareToken}
-              legal={validation.legal}
-              imageLines={lines.map((l) => ({ section: l.section, quantity: l.quantity, name: cards.get(l.cardId)?.name ?? "?", energy: cards.get(l.cardId)?.energy ?? null }))}
             />
           </section>
         </aside>

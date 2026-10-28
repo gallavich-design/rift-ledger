@@ -1,5 +1,17 @@
 # Changelog
 
+## Deck image as a card grid (2026-10-28)
+
+No schema changes.
+
+- Deck → Export → **Image** now makes a card-grid PNG: Legend name above the deck name, legality and
+  section counts, then every card's art with a ×N badge in deck order (Legend, runes, battlefields
+  turned upright, chosen champion, main deck by cost), sideboard below. Frames take the card's domain
+  colour. Light theme. **Preview** opens it in a new tab.
+- Drawn on the server (`/decks/<id>/image`, next/og + IBM Plex) so card art from the card sites can be
+  embedded — a browser canvas can't export images from other sites.
+
+
 ## "I own all of these" on decks (2026-10-28)
 
 No schema changes.
