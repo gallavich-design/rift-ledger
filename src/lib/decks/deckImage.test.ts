@@ -17,15 +17,16 @@ const deck: ImageCard[] = [
 ];
 
 describe("deck image grouping", () => {
-  it("deck order: legend, runes, battlefields, champion, then main by cost; sideboard last", () => {
+  it("deck order: legend with the champion beside it, runes, battlefields, then main by cost; sideboard last", () => {
     const g = groupCards(deck, "section");
     expect(g.map((x) => x.title)).toEqual([null, "Sideboard · 2"]);
-    expect(g[0].cards.map((c) => c.cardId)).toEqual(["legend", "calm", "bf1", "champ", "token", "s", "g", "u-small", "u-big"]);
+    expect(g[0].cards.map((c) => c.cardId)).toEqual(["legend", "champ", "calm", "bf1", "token", "s", "g", "u-small", "u-big"]);
   });
 
   it("by card type: units, gear, spells (others last), each with its copies", () => {
     const g = groupCards(deck, "type");
     expect(g.map((x) => x.title)).toEqual([null, "Units · 6", "Gear · 2", "Spells · 3", "Other · 1", "Sideboard · 2"]);
+    expect(g[0].cards.map((c) => c.cardId)).toEqual(["legend", "champ", "calm", "bf1"]);
     expect(g[1].cards.map((c) => c.cardId)).toEqual(["u-small", "u-big"]);
   });
 });

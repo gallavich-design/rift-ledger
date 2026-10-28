@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-28 — Deck image: Chosen Champion beside the Legend
+
+- The exported deck image now starts Legend → Chosen Champion → runes → battlefields, so the Champion sits right next to the Legend (in both "Deck order" and "By card type").
+
 ## 2026-10-28 — Every rune printing, from every set
 
 No schema changes. Press **Sync now** in Settings (then **Update prices**) to pull them in.

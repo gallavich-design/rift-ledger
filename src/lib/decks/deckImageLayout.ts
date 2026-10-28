@@ -67,13 +67,13 @@ const TYPE_GROUPS = [
 ];
 
 /**
- * Deck order: Legend, runes, battlefields, chosen champion, then the main deck by cost — or, grouped
+ * Deck order: Legend with the Chosen Champion right beside it, runes, battlefields, then the main deck by cost — or, grouped
  * by type, the main deck split into Units / Gear / Spells (anything else under "Other"). Sideboard last.
  */
 export function groupCards(cards: ImageCard[], grouping: ImageGrouping): Group[] {
   const live = cards.filter((c) => c.quantity > 0);
   const of = (s: Section) => live.filter((c) => c.section === s);
-  const core = [...of("LEGEND").sort(byName), ...of("RUNES").sort(byName), ...of("BATTLEFIELDS").sort(byName), ...of("CHAMPION").sort(byName)];
+  const core = [...of("LEGEND").sort(byName), ...of("CHAMPION").sort(byName), ...of("RUNES").sort(byName), ...of("BATTLEFIELDS").sort(byName)];
   const main = of("MAIN").sort(byCost);
   const groups: Group[] = [];
   if (grouping === "type") {
