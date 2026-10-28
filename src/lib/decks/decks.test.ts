@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GAME_RULES } from "@/config/gameRules";
 import { buildIndex, type SearchDoc } from "@/lib/catalog/search";
 import { normalizeForSearch } from "@/lib/catalog/grouping";
-import { costDeck, type CardPricing } from "./cost";
+import { costDeck, ownershipShortfall, type CardPricing } from "./cost";
 import { diffSnapshots, formatDiff } from "./diff";
 import { parseDecklistText, sectionFromHeader } from "./parse";
 import { resolveDecklist } from "./resolve";
@@ -147,6 +147,51 @@ describe("Example D — deck cost to complete", () => {
     // legality counts quantity (proxies included): a proxy line still satisfies rune/size rules
     const legal = legalDeck().map((l) => (l.cardId === "m1" ? { ...l, proxyQuantity: 2 } : l));
     expect(check(legal).legal).toBe(true);
+  });
+});
+
+describe("I own all of these (mark the deck as owned)", () => {
+  // Example D's deck: own P×1, Q×0, R×3 (one R is a proxy in the deck), S×4.
+  const lines: DeckLine[] = [
+    { cardId: "P", section: "MAIN", quantity: 3, proxyQuantity: 0 },
+    { cardId: "Q", section: "MAIN", quantity: 2, proxyQuantity: 0, preferredVariantId: "q-foil" },
+    { cardId: "R", section: "MAIN", quantity: 3, proxyQuantity: 1 },
+    { cardId: "S", section: "MAIN", quantity: 4, proxyQuantity: 0 },
+    { cardId: "T", section: "MAIN", quantity: 2, proxyQuantity: 2 },
+  ];
+  const owned = new Map([["P", 1], ["R", 3], ["S", 4]]);
+  const pricing = new Map([priced("P", [["p", 1200]]), priced("Q", [["q", 3000], ["q-foil", 4500]], "q"), priced("R", [["r", 200]]), priced("S", [["s", 500]]), priced("T", [["t", null]])]);
+
+  it("adds only what's missing, in your chosen printing, leaving proxies alone", () => {
+    const s = ownershipShortfall(lines, owned, pricing, false);
+    expect(s).toEqual([
+      { cardId: "P", add: 2, proxies: 0, variantId: "p", unit: 1200 },
+      { cardId: "Q", add: 2, proxies: 0, variantId: "q-foil", unit: 4500 },
+    ]);
+  });
+
+  it("with proxies included, adds the real copies for them too (R is already covered by the 3 you own)", () => {
+    const s = ownershipShortfall(lines, owned, pricing, true);
+    expect(s.map((x) => [x.cardId, x.add])).toEqual([["P", 2], ["Q", 2], ["T", 2]]);
+    expect(s.find((x) => x.cardId === "T")).toMatchObject({ variantId: "t", unit: null });
+  });
+
+  it("prices the copies exactly like cost to complete", () => {
+    const noProxies = lines.map((l) => ({ ...l, proxyQuantity: 0 }));
+    const s = ownershipShortfall(noProxies, owned, pricing, true);
+    expect(s.reduce((a, x) => a + (x.unit ?? 0) * x.add, 0)).toBe(costDeck(noProxies, owned, pricing).costToComplete);
+    // a card whose default printing has no price uses the cheapest priced one, like cost to complete
+    const p2 = new Map([priced("Z", [["z-std", null], ["z-foil", 700]], "z-std")]);
+    expect(ownershipShortfall([{ cardId: "Z", section: "MAIN", quantity: 2, proxyQuantity: 0 }], new Map(), p2, false)).toEqual([{ cardId: "Z", add: 2, proxies: 0, variantId: "z-foil", unit: 700 }]);
+  });
+
+  it("after adding them, nothing is missing", () => {
+    const s = ownershipShortfall(lines, owned, pricing, true);
+    const after = new Map(owned);
+    for (const x of s) after.set(x.cardId, (after.get(x.cardId) ?? 0) + x.add);
+    const proxyFree = lines.map((l) => ({ ...l, proxyQuantity: 0 }));
+    expect(costDeck(proxyFree, after, pricing).missingCopies).toBe(0);
+    expect(ownershipShortfall(proxyFree, after, pricing, true)).toEqual([]);
   });
 });
 

@@ -108,3 +108,32 @@ export function costDeck(lines: DeckLine[], owned: Map<string, number>, pricing:
   out.swaps.sort((x, y) => y.saving - x.saving);
   return out;
 }
+
+export interface ShortfallLine {
+  cardId: string;
+  add: number; // copies to add to the collection
+  proxies: number; // proxied copies in the deck
+  variantId: string | null; // printing to add: your chosen one, else the default
+  unit: number | null; // its price, display currency
+}
+
+/**
+ * "I own all of these": how many copies of each card to add so the collection covers the deck.
+ * Counts any printing you already own. Proxied copies are left alone unless `includeProxies`
+ * (you've since got the real cards). Same pricing choice as cost to complete.
+ */
+export function ownershipShortfall(lines: DeckLine[], owned: Map<string, number>, pricing: Map<string, CardPricing>, includeProxies: boolean): ShortfallLine[] {
+  const cost = costDeck(lines, owned, pricing);
+  const out: ShortfallLine[] = [];
+  for (const l of cost.lines) {
+    const need = includeProxies ? l.quantity : l.quantity - l.proxies;
+    const add = Math.max(0, need - (owned.get(l.cardId) ?? 0));
+    if (!add) continue;
+    // Same printing cost to complete uses (chosen → default → cheapest priced), so the totals agree.
+    const p = pricing.get(l.cardId);
+    const preferred = lines.find((x) => x.cardId === l.cardId && x.preferredVariantId)?.preferredVariantId ?? null;
+    const variantId = l.normal?.variantId ?? preferred ?? p?.defaultVariantId ?? p?.variants[0]?.variantId ?? null;
+    out.push({ cardId: l.cardId, add, proxies: l.proxies, variantId, unit: l.normal?.unit ?? null });
+  }
+  return out;
+}

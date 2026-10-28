@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { DomainStripe } from "@/components/cards/DomainStripe";
 import { cn } from "@/lib/ui";
 import { saveDeck } from "../actions";
+import { MarkOwned } from "./MarkOwned";
 
 interface Props {
   deckId: string;
@@ -57,6 +58,14 @@ export function DeckEditor(p: Props) {
 
   // Server data changed (e.g. an import line was resolved) and nothing local is unsaved → adopt it.
   const serverKey = JSON.stringify(p.initialLines) + p.initialName;
+  // Copies owned can change without the deck changing (e.g. "I own all of these"): take them as they come.
+  const ownedKey = JSON.stringify(p.owned);
+  const lastOwnedKey = useRef(ownedKey);
+  useEffect(() => {
+    if (lastOwnedKey.current === ownedKey) return;
+    lastOwnedKey.current = ownedKey;
+    setOwned(new Map(p.owned));
+  }, [ownedKey, p.owned]);
   const lastServerKey = useRef(serverKey);
   useEffect(() => {
     if (lastServerKey.current === serverKey) return;
@@ -376,16 +385,17 @@ export function DeckEditor(p: Props) {
           <Panel title="Cost" testid="cost">
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
               <Fact label="Deck value" value={fmt(cost.value)} />
-              <Fact label="You own" value={`${cost.ownedCopies} / ${cost.copies}`} hint="copies" />
+              <Fact label="You own" value={`${cost.ownedCopies} / ${cost.copies}`} hint="copies" testid="owned-copies" />
               <Fact label="Cost to complete" value={fmt(cost.costToComplete)} strong testid="cost-to-complete" />
               <Fact label="Budget to complete" value={fmt(cost.budgetCostToComplete)} testid="budget-to-complete" />
               <Fact label="Budget build" value={fmt(cost.budgetValue)} hint="cheapest printings" testid="budget-value" />
-              <Fact label="Missing" value={`${cost.missingCopies}`} hint="copies, incl. proxies" />
+              <Fact label="Missing" value={`${cost.missingCopies}`} hint="copies, incl. proxies" testid="missing-copies" />
             </dl>
             <p className="mt-3 text-xs text-ink-3">
               Priced at {p.sourceLabel}
               {cost.unpriced.length > 0 && <> · {cost.unpriced.length} card{cost.unpriced.length === 1 ? "" : "s"} without a price</>}
             </p>
+            <MarkOwned deckId={p.deckId} lines={lines} owned={owned} pricing={pricing} names={names} currency={p.currency} today={p.today} dirty={dirty} />
             {cost.swaps.length > 0 && (
               <details className="mt-3 border-t border-rule pt-3" data-testid="swaps">
                 <summary className="cursor-pointer text-sm font-medium">

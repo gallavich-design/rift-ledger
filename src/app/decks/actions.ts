@@ -10,7 +10,9 @@ import { getSearchIndex } from "@/lib/catalog/search";
 import { parseDecklistText } from "@/lib/decks/parse";
 import { resolveDecklist, sectionFor, type UnrecognizedLine } from "@/lib/decks/resolve";
 import { diffSnapshots, type SnapshotLine } from "@/lib/decks/diff";
-import { toSnapshot } from "@/lib/decks/data";
+import { deckLinesFromRows, loadDeckPricing, loadOwned, toSnapshot } from "@/lib/decks/data";
+import { ownershipShortfall } from "@/lib/decks/cost";
+import { getFx, getSettings, missingRates } from "@/lib/portfolio/data";
 import { SECTIONS, type DeckLine } from "@/lib/decks/types";
 
 export type Result<T = undefined> = { ok: true; data: T; message?: string } | { ok: false; message: string; fieldErrors?: Record<string, string> };
@@ -243,4 +245,77 @@ export async function deleteMatch(matchId: string): Promise<Result> {
   await db.matchResult.delete({ where: { id: m.id } });
   refresh(m.deckId);
   return { ok: true, data: undefined };
+}
+
+// ───────────────────────────── I own all of these ─────────────────────────────
+
+const MarkOwnedInput = z.object({
+  deckId: z.string().min(1),
+  includeProxies: z.boolean(),
+  cost: z.enum(["market", "zero"]),
+  acquiredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date").refine((d) => d <= dayKey(), "The date can't be in the future"),
+});
+export type MarkOwnedPayload = z.input<typeof MarkOwnedInput>;
+
+/**
+ * Adds the copies this deck needs that you don't own yet, as one order ("From deck: …"), so the
+ * collection covers the deck. Works from the saved deck. Undo = delete that order.
+ */
+export async function markDeckOwned(payload: MarkOwnedPayload): Promise<Result<{ orderId: string | null; copies: number; cards: number }>> {
+  const parsed = MarkOwnedInput.safeParse(payload);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
+  const o = parsed.data;
+  const userId = await getCurrentUserId();
+  const deck = await db.deck.findFirst({ where: { id: o.deckId, userId }, include: { cards: true } });
+  if (!deck) return { ok: false, message: "That deck no longer exists." };
+
+  const settings = await getSettings(db, userId);
+  const fx = await getFx(db, settings.fxOverrides);
+  const display = settings.displayCurrency;
+  if (missingRates(fx.table, [display]).length) return { ok: false, message: `No exchange rate for ${display} yet — set one in Settings.` };
+  const lines = deckLinesFromRows(deck.cards);
+  const cardIds = [...new Set(lines.map((l) => l.cardId))];
+  const [pricing, owned] = await Promise.all([loadDeckPricing(db, userId, cardIds, settings.defaultValuationSource, fx.table, display), loadOwned(db, userId, cardIds)]);
+  const short = ownershipShortfall(lines, owned, pricing, o.includeProxies).filter((s) => s.variantId);
+  const clearProxies = o.includeProxies && deck.cards.some((c) => c.proxyQuantity > 0);
+  if (!short.length && !clearProxies) return { ok: true, data: { orderId: null, copies: 0, cards: 0 }, message: "You already own every card in this deck." };
+
+  const acquiredOn = dayToDate(o.acquiredOn);
+  const orderId = await db.$transaction(async (tx) => {
+    let id: string | null = null;
+    if (short.length) {
+      const order = await tx.order.create({
+        data: { userId, orderedOn: acquiredOn, seller: `From deck: ${deck.name}`.slice(0, 120), currency: display, notes: "Added with “I own all of these” on the deck page." },
+      });
+      id = order.id;
+      for (const s of short) {
+        const unit = o.cost === "market" ? (s.unit ?? 0) : 0;
+        await tx.lot.create({
+          data: {
+            userId,
+            orderId: order.id,
+            variantId: s.variantId!,
+            quantity: s.add,
+            remainingQuantity: s.add,
+            unitPrice: unit,
+            landedUnitCost: unit,
+            landedTotal: unit * s.add,
+            currency: display,
+            condition: "NM",
+            acquiredOn,
+            notes: o.cost === "market" ? (s.unit != null ? "cost = market price when marked owned" : "no price — cost 0") : "cost not recorded",
+          },
+        });
+      }
+    }
+    if (clearProxies) await tx.deckCard.updateMany({ where: { deckId: deck.id }, data: { proxyQuantity: 0 } });
+    return id;
+  });
+  revalidatePath(`/decks/${deck.id}`);
+  revalidatePath("/decks");
+  revalidatePath("/dashboard");
+  revalidatePath("/collection", "layout");
+  revalidatePath("/cards", "layout");
+  const copies = short.reduce((a, s) => a + s.add, 0);
+  return { ok: true, data: { orderId, copies, cards: short.length } };
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## "I own all of these" on decks (2026-10-28)
+
+No schema changes.
+
+- Deck cost panel: **I own all of these** adds every copy the deck needs that isn't in your
+  collection yet — counting any printing you already own — as one order ("From deck: <name>").
+  You pick the cost basis (market price, matching cost to complete, or not recorded) and the date.
+  Proxied copies are left alone unless you tick that you have the real cards (which also clears the
+  proxy marks). Undo by deleting the order. Works from the saved deck.
+
+
 ## Radiance in the catalogue (2026-10-28)
 
 No schema changes.
